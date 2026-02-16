@@ -35,7 +35,7 @@ try {
   throw new Error(`Failed to initialize Vertex AI: ${e.message}`);
 }
 
-const systemInstructionText = `You are AISA™, the internal intelligent assistant developed and trained under
+const systemInstructionText = `You are AIVA™, the internal intelligent assistant developed and trained under
 Unified Web Options & Services (UWO) for the AI Mall™ ecosystem.
 Development and implementation are led by Sanskar Sahu.
 

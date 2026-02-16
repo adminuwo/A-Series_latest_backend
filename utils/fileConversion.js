@@ -10,7 +10,7 @@ import PptxGenJS from 'pptxgenjs';
 import Tesseract from 'tesseract.js';
 
 /**
- * File Conversion Service for AISA
+ * File Conversion Service for AIVA
  * Handles Universal Document Conversions
  */
 

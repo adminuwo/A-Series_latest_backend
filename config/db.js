@@ -1,6 +1,10 @@
 import mongoose from 'mongoose';
+import dns from 'dns';
 import { MONGO_URI } from './env.js';
 import logger from '../utils/logger.js';
+
+// Use Google DNS to resolve MongoDB SRV records
+dns.setServers(['8.8.8.8', '8.8.4.4']);
 
 console.log("MONGO_URI", MONGO_URI);
 const connectDB = async () => {
