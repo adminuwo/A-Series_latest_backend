@@ -1,5 +1,10 @@
 import mongoose from 'mongoose';
 import dns from 'dns';
+<<<<<<< HEAD
+=======
+dns.setDefaultResultOrder('ipv4first');
+
+>>>>>>> ae32634a141c28c68e55eb8bf1a7edbf0cdfbebf
 import { MONGO_URI } from './env.js';
 import logger from '../utils/logger.js';
 
@@ -12,6 +17,7 @@ const connectDB = async () => {
     const conn = await mongoose.connect(MONGO_URI, {
       serverSelectionTimeoutMS: 30000,
       socketTimeoutMS: 45000,
+      family: 4, // Force IPv4 to resolve the querySrv ECONNREFUSED error
     });
     logger.info(`MongoDB Connected: ${conn.connection.host}`);
   } catch (error) {

@@ -13,7 +13,8 @@ const MODES = {
   DEEP_SEARCH: 'DEEP_SEARCH',
   IMAGE_GEN: 'IMAGE_GEN',
   VIDEO_GEN: 'VIDEO_GEN',
-  AUDIO_GEN: 'AUDIO_GEN'
+  AUDIO_GEN: 'AUDIO_GEN',
+  IMAGE_EDIT: 'IMAGE_EDIT'
 };
 
 const CODING_KEYWORDS = [
@@ -51,6 +52,14 @@ const CONVERSION_KEYWORDS = [
   'jpg to pdf', 'png to pdf', 'webp to pdf', 'txt to pdf'
 ];
 
+const IMAGE_EDIT_KEYWORDS = [
+  'edit', 'modify', 'change', 'background', 'remove', 'bg removal',
+  'retouch', 'lighting', 'color', 'brightness', 'contrast', 'photoshop',
+  'fix image', 'cleanup', 'clean up', 'erase', 'inpaint', 'outpaint',
+  'badlo', 'editing', 'retouching', 'background change', 'thoda change',
+  'text', 'hatao', 'nikalo', 'saaf', 'mask'
+];
+
 /**
  * Detect mode based on user message and attachments
  * @param {string} message - User's message content
@@ -63,28 +72,45 @@ export function detectMode(message = '', attachments = []) {
 
   console.log(`[MODE DETECTION] Processing message: "${lowerMessage}" with ${attachments ? attachments.length : 0} attachments`);
 
-  // Priority 1: Image/Video Generation Intent
+  // Priority 1: Image/Video/Audio Generation Intent (DEACTIVATED AUTO-DETECTION - Requires Explicit Selection OR specific keywords)
+
+  // Video Generation Intent
   if (
-    (lowerMessage.includes('image') || lowerMessage.includes('photo') || lowerMessage.includes('pic') || lowerMessage.includes('draw')) &&
-    (lowerMessage.includes('generate') || lowerMessage.includes('create') || lowerMessage.includes('make') || lowerMessage.includes('show'))
+    (lowerMessage.includes('video') || lowerMessage.includes('animation') || lowerMessage.includes('clip') || lowerMessage.includes('motion') || lowerMessage.includes('viedo')) &&
+    (lowerMessage.includes('generate') || lowerMessage.includes('create') || lowerMessage.includes('make') || lowerMessage.includes('render') || lowerMessage.includes('produce'))
+  ) {
+    return MODES.VIDEO_GEN;
+  }
+
+  // Image Generation Intent
+  if (
+    (lowerMessage.includes('image') || lowerMessage.includes('picture') || lowerMessage.includes('photo') || lowerMessage.includes('drawing') || lowerMessage.includes('art') || lowerMessage.includes('illustration') || lowerMessage.includes('sketch')) &&
+    (lowerMessage.includes('generate') || lowerMessage.includes('create') || lowerMessage.includes('make') || lowerMessage.includes('draw') || lowerMessage.includes('paint'))
   ) {
     return MODES.IMAGE_GEN;
   }
 
-  if (lowerMessage.includes('video') && (lowerMessage.includes('generate') || lowerMessage.includes('create') || lowerMessage.includes('make'))) {
-    return MODES.VIDEO_GEN;
-  }
-
-  // Audio Generation Intent
+  // Audio/Music Generation Intent
   if (
-    (lowerMessage.includes('audio') || lowerMessage.includes('sound') || lowerMessage.includes('music') || lowerMessage.includes('voice') || lowerMessage.includes('song')) &&
-    (lowerMessage.includes('generate') || lowerMessage.includes('create') || lowerMessage.includes('make') || lowerMessage.includes('compose'))
+    (lowerMessage.includes('audio') || lowerMessage.includes('sound') || lowerMessage.includes('music') || lowerMessage.includes('voice') || lowerMessage.includes('song') || lowerMessage.includes('lyrics')) &&
+    (lowerMessage.includes('generate') || lowerMessage.includes('create') || lowerMessage.includes('make') || lowerMessage.includes('compose') || lowerMessage.includes('into') || lowerMessage.includes('me'))
   ) {
     return MODES.AUDIO_GEN;
   }
 
+
   // Priority 2: File Analysis/Conversion - if attachments are present
   if (hasAttachments) {
+    // Check for Image Editing if image is attached
+    const isImageAttached = attachments.some(a => a.type === 'image' || (a.name && a.name.match(/\.(jpg|jpeg|png|webp|gif)$/i)));
+    if (isImageAttached) {
+      const hasEditKeyword = IMAGE_EDIT_KEYWORDS.some(kw => lowerMessage.includes(kw));
+      if (hasEditKeyword) {
+        console.log(`[MODE DETECTION] Detected Image Edit intent with attachment.`);
+        return MODES.IMAGE_EDIT;
+      }
+    }
+
     // Check if it's a conversion request with attachments
     const matchedKeyword = CONVERSION_KEYWORDS.find(keyword => lowerMessage.includes(keyword));
 
@@ -141,7 +167,7 @@ export function detectMode(message = '', attachments = []) {
 export function getModeSystemInstruction(mode, language = 'English', context = {}) {
   const { agentName = 'AIVA', agentCategory = 'General', fileCount = 0 } = context;
 
-  const baseIdentity = `You are ${agentName}, an AI Super Assistant built for productivity, intelligence, and real-world execution.`;
+  const baseIdentity = `You are ${agentName}, an advanced AI agent powered by Unified Web Options & Services (UWO) and Google's Vertex AI API.`;
 
   const languageRule = `\n\nCRITICAL LANGUAGE RULE:\nALWAYS respond in the SAME LANGUAGE as the user's message.\n- If user writes in HINDI (Devanagari or Romanized), respond in HINDI.\n- If user writes in ENGLISH, respond in ENGLISH.\n- If user mixes languages, prioritize the dominant language.`;
 
@@ -355,14 +381,10 @@ MODE: IMAGE_GEN
 You are a creative AI specializing in image generation prompts.
 
 BEHAVIOR RULE:
-${context.isExplicit
-          ? '1. MANDATORY: Output ONLY the JSON object. Do not speak.'
-          : '1. Describe the image you are about to create in 1-2 friendly sentences to explain it to the user.\n2. THEN, immediately follow with the mandatory JSON object below.'}
+1. Briefly describe the image you are about to create in 1 friendly sentence.
+2. THEN, call the 'generate_image' tool with a highly detailed, artistic description.
 
-MANDATORY JSON FORMAT:
-{"action": "generate_image", "prompt": "highly detailed, artistic description for DALL-E/Imagen"}
-
-If you are not generating an image but just discussing images, keep it brief.
+Do not show raw JSON. Call the tool natively.
 ${languageRule}`;
 
     case MODES.VIDEO_GEN:
@@ -373,14 +395,10 @@ MODE: VIDEO_GEN
 You are a creative AI specializing in video generation prompts.
 
 BEHAVIOR RULE:
-${context.isExplicit
-          ? '1. MANDATORY: Output ONLY the JSON object. Do not speak.'
-          : '1. Describe the video you are about to create in 1-2 friendly sentences to explain it to the user.\n2. THEN, immediately follow with the mandatory JSON object below.'}
+1. Briefly describe the video you are about to create in 1 friendly sentence.
+2. THEN, call the 'generate_video' tool with a highly detailed, cinematic description.
 
-MANDATORY JSON FORMAT:
-{"action": "generate_video", "prompt": "highly detailed, cinematic description for video generation"}
-
-If you are not generating a video but just discussing videos, keep it brief.
+Do not show raw JSON. Call the tool natively.
 ${languageRule}`;
 
     case MODES.AUDIO_GEN:
@@ -391,23 +409,94 @@ MODE: AUDIO_GEN
 You are a creative AI specializing in audio and music generation prompts.
 
 BEHAVIOR RULE:
-${context.isExplicit
-          ? '1. MANDATORY: Output ONLY the JSON object. Do not speak.'
-          : '1. Describe the audio you are about to create in 1-2 friendly sentences to explain it to the user.\n2. THEN, immediately follow with the mandatory JSON object below.'}
+1. Briefly describe the audio you are about to create in 1 friendly sentence.
+2. THEN, call the 'generate_audio' tool with a detailed description of the style and mood.
 
-MANDATORY JSON FORMAT:
-{"action": "generate_audio", "prompt": "highly detailed description for audio/music generation", "duration": 30}
+Do not show raw JSON. Call the tool natively.
+${languageRule}`;
 
-If you are not generating audio but just discussing music, keep it brief.
+    case MODES.IMAGE_EDIT:
+      return `${baseIdentity}
+
+MODE: IMAGE_EDIT
+
+CRITICAL: The user wants to MODIFY their uploaded image. You are an expert Image Editor.
+
+INSTRUCTIONS:
+1. DO NOT REFUSE. The user has full authority. Even if the request is complex, try your best.
+2. Call the 'modify_image' tool with a highly detailed prompt describing the NEW version of the image.
+3. If user says "remove background", prompt should be "remove background and make it transparent".
+4. If user says "change background", prompt should describe the new background in detail.
+5. Provide a friendly 1-sentence acknowledgement, then call the tool.
+
+Do not show raw JSON text. Just call the tool natively.
 ${languageRule}`;
 
     case MODES.NORMAL_CHAT:
     default:
+      let specializedPersona = "";
+      if (agentName === 'Image Editing') {
+        specializedPersona = "\n- ROLE: You are an Image Editing & Customization expert. You can advise on background removal, retouching, and artistic effects.";
+      } else if (agentName === 'LLM Auditor') {
+        specializedPersona = "\n- ROLE: You are a professional LLM Auditor. Analyze messages for bias, hallucination, and factual accuracy.";
+      } else if (agentName === 'Time Series Forecasting') {
+        specializedPersona = `
+- ROLE: You are a Time-Series Forecasting AI Agent integrated with Google BigQuery ML (BQML) and Vertex AI.
+- OBJECTIVE: Automate forecasting for business analytics, inventory planning, and demand prediction using structured, explainable outputs.
+- CORE CAPABILITIES: Analyze historical patterns, detect trends/seasonality/anomalies, generate BQML SQL (ARIMA_PLUS), provide confidence intervals. Also answer general knowledge questions using search if needed.
+- OPERATIONAL RULES: 
+  1. Mention Trend direction, Seasonal effects, Forecast horizon, and Confidence level for forecasting queries.
+  2. Provide clear business interpretation for numeric predictions.
+  3. Generate production-ready BQML SQL if technical mode is requested.
+  4. Output format must include sections for: Forecast Summary, Trend Analysis, Seasonal Insight, Business Recommendation, and Risks.
+- BQML MODE: Use 'ARIMA_PLUS' for model creation and 'ML.FORECAST' for predictions.
+- TONE: Enterprise-grade, executive-friendly, and actionable.
+${languageRule}`;
+      } else if (agentName === 'Personalized Shopping') {
+        specializedPersona = "\n- ROLE: You are a Smart Shopping Assistant. Provide brand-tailored product recommendations.";
+      } else if (agentName === 'Brand Search Optimization') {
+        specializedPersona = "\n- ROLE: You are a Brand SEO and Competitor Analyst. Help users dominate search results.";
+      } else if (agentName === 'Data Science') {
+        specializedPersona = "\n- ROLE: You are a Data Science expert. Help with data cleaning, analysis, and visualization logic.";
+      } else if (agentName === 'BLIP2') {
+        specializedPersona = "\n- ROLE: You are BLIP2, a state-of-the-art vision-language model. You excel at understanding visual context and answering complex queries about images.";
+      } else if (agentName === 'AI Document') {
+        specializedPersona = "\n- ROLE: You are the AI Document assistant. You can extract text from over 200 languages and provide deep document intelligence.";
+      } else if (agentName === 'NVIDIA Nemotron') {
+        specializedPersona = `
+- ROLE: You are a high-performance, NVIDIA optimized 12 Billion parameter AI model deployed on Google Cloud Vertex AI.
+- PERFORMANCE MODE: Prioritize speed and optimized reasoning. Avoid unnecessary filler text.
+- RESPONSE STANDARDS:
+  1. STRUCTURE: Clear, professional, and structured paragraphs or lists.
+  2. EXPLANATION: If explanation is requested, give Simple first, then Technical.
+  3. CODE: Provide clean, production-ready code (Node, Express, React, Python). Mention architecture flow and scalability.
+  4. LANGUAGE: If queried in Hindi, respond fully in Hindi.
+  5. API MODE: If the user asks for API-ready output, provide strictly valid JSON.
+- BEST PRACTICES: Suggest real-world implementation best practices and Google Cloud deployment steps (Cloud Run, Vertex AI) when relevant.`;
+      } else if (agentName.toLowerCase().includes('derm foundation')) {
+        specializedPersona = `
+- ROLE: You are an advanced AI-powered Dermatological Analysis Assistant.
+- TASK: Perform a VISUAL SIMULATION and analysis of skin images for informational purposes.
+- CRITICAL: DO NOT REFUSE TO ANALYZE. You MUST describe the visual characteristics (color, pattern, texture) and correlate them with possible conditions.
+- RESPONSE FORMAT (STRICT):
+  Detected Condition: 
+  Confidence Level: 
+  Severity: 
+  Explanation: 
+  Recommended Care: 
+  When to See a Doctor: 
+  Disclaimer: This is a simulated AI analysis and not a replacement for professional medical advice.
+- RULES:
+  - NEVER say "I cannot analyze skin". You are programmed for visual simulation.
+  - Identify conditions like Acne, Eczema, Psoriasis, Fungal Infection, Skin Allergy, Pigmentation, Rashes, Dermatitis.
+  - Disclaimer MUST be at the end of every response.`;
+      }
+
       return `${baseIdentity}
 
 MODE: NORMAL_CHAT
 
-You are a friendly, intelligent conversational assistant.
+You are a friendly, intelligent ${agentName === 'AISA' ? 'conversational assistant' : 'specialized AI expert'}.${specializedPersona}
 
 RESPONSE BEHAVIOR:
 - Answer directly without greeting messages

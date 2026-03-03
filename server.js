@@ -5,6 +5,18 @@ import cors from "cors";
 import connectDB from "./config/db.js";
 import chatRoutes from "./routes/chatRoutes.js";
 
+// Global process error handlers to prevent crashes from unhandled library errors (like Tesseract workers)
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('[CRITICAL] Unhandled Rejection at:', promise, 'reason:', reason);
+});
+
+process.on('uncaughtException', (err) => {
+  console.error('[CRITICAL] Uncaught Exception:', err.message);
+  console.error(err.stack);
+  // Optional: Graceful exit if it's a truly fatal state, but usually nodemon will restart us
+  // process.exit(1); 
+});
+
 import dashboardRoutes from "./routes/dashboardRoutes.js";
 import agentRoutes from "./routes/agentRoutes.js";
 import authRoutes from "./routes/authRoutes.js";
@@ -30,25 +42,60 @@ import paymentRoutes from './routes/paymentRoutes.js';
 import contactRoutes from './routes/contactRoutes.js';
 import imageRoute from './routes/image.routes.js';
 import videoRoutes from './routes/videoRoutes.js';
+import audioRoutes from './routes/audioRoutes.js';
+import searchRoutes from './routes/searchRoutes.js';
+import conversionRoutes from './routes/conversionRoutes.js';
+import reminderRoutes from './routes/reminderRoutes.js';
+import openaiRoutes from './routes/openai.routes.js';
+import { initializeOpenAI } from './config/openai.js';
 
 
 dotenv.config();
 const app = express();
 const PORT = process.env.PORT
+import { seedTools } from "./utils/seedTools.js";
+
 // Connect to Database
-connectDB().then(() => {
+connectDB().then(async () => {
   console.log("Database connected, initializing services...");
-  aibaseService.initializeFromDB();
+  await aibaseService.initializeFromDB();
+  await initializeOpenAI();
+  await seedTools();
 });
 
 
 // Middleware
 
+// Debug CORS
+const allowedOrigins = [
+  "http://localhost:5173",
+  "http://localhost:5174",
+  "http://localhost:5175",
+  "http://localhost:8080",
+  "http://127.0.0.1:5173",
+  "http://127.0.0.1:5174",
+  "http://127.0.0.1:5175",
+  "http://192.168.29.47:5173",
+  process.env.FRONTEND_URL
+].filter(Boolean);
+
+console.log("Allowed CORS Origins:", allowedOrigins);
+
 app.use(cors({
-  origin: true, // Allow any origin in development
+  origin: (origin, callback) => {
+    // Allow requests with no origin (like mobile apps or curl requests)
+    if (!origin) return callback(null, true);
+
+    if (allowedOrigins.indexOf(origin) !== -1 || origin === process.env.FRONTEND_URL) {
+      callback(null, true);
+    } else {
+      console.log(`[CORS BLOCK] Origin: ${origin} not allowed`);
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'x-device-fingerprint']
+  allowedHeaders: ['Content-Type', 'Authorization', 'x-device-fingerprint', 'Access-Control-Allow-Origin']
 }));
 app.use(cookieParser())
 app.use(express.json({ limit: "50mb" }));
@@ -85,6 +132,11 @@ app.use('/api/chat', chatRoutes);
 // Image & Video Gen Routes
 app.use('/api/image', imageRoute);
 app.use('/api/video', videoRoutes);
+app.use('/api/audio', audioRoutes);
+app.use('/api/conversion', conversionRoutes);
+app.use('/api/reminders', reminderRoutes);
+app.use('/api/search', searchRoutes);
+app.use('/api/openai', openaiRoutes);
 
 
 // Auth Routes: /api/auth/login, /api/auth/signup

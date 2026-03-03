@@ -48,6 +48,21 @@ const AgentSchema = new mongoose.Schema(
             default: ""
         },
 
+        fullDesc: {
+            type: String,
+            default: ""
+        },
+
+        features: {
+            type: [String],
+            default: []
+        },
+
+        bgGradient: {
+            type: String,
+            default: "bg-gradient-to-br from-gray-500 to-gray-600"
+        },
+
         category: {
             type: String,
             required: true,
@@ -130,7 +145,16 @@ const AgentSchema = new mongoose.Schema(
             mimetype: String,
             size: Number,
             uploadDate: { type: Date, default: Date.now }
-        }]
+        }],
+        provider: {
+            type: String,
+            enum: ["vertex", "openai", "google", "anthropic"],
+            default: "vertex"
+        },
+        modelMapping: {
+            type: String,
+            default: ""
+        }
     },
     {
         timestamps: true

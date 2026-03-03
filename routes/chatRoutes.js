@@ -1,7 +1,8 @@
 import mongoose from "mongoose";
 import express from "express"
 import Conversation from "../models/Conversation.js"
-import { generativeModel, genAIInstance, modelName as primaryModelName } from "../config/vertex.js";
+import { generativeModel, genAIInstance, modelName as primaryModelName, vertexAI, HarmCategory, HarmBlockThreshold } from "../config/vertex.js";
+import { toolDeclarations } from "../config/vertexTools.js";
 import userModel from "../models/User.js";
 // import Guest from "../models/Guest.js";
 import { verifyToken, optionalVerifyToken } from "../middleware/authorization.js";
@@ -15,7 +16,12 @@ import { requiresWebSearch, extractSearchQuery, processSearchResults, getWebSear
 import { performWebSearch } from "../services/searchService.js";
 import { convertFile } from "../utils/fileConversion.js";
 import { generateVideoFromPrompt } from "../controllers/videoController.js";
-import { generateImageFromPrompt } from "../controllers/image.controller.js";
+import { generateImageFromPrompt, modifyImageFromPrompt } from "../controllers/image.controller.js";
+import { generateMusicFromPrompt } from "../controllers/music.controller.js";
+
+import openaiService from "../services/openaiService.js";
+import Agent from "../models/Agents.js";
+import UsageTracking from "../models/UsageTracking.js";
 
 import axios from "axios";
 
@@ -27,15 +33,134 @@ const checkGuestLimits = async (req, sessionId) => {
   return { allowed: true };
 };
 
+const logUsage = async (userId, agentId, tokensUsed = 0, featureName = '') => {
+  try {
+    await UsageTracking.findOneAndUpdate(
+      { userId, agentId },
+      {
+        $inc: { tokensUsed, messagesSent: 1 },
+        $set: { lastUsed: new Date(), provider: 'openai' },
+        $push: { featuresUsed: { name: featureName, timestamp: new Date() } }
+      },
+      { upsert: true, new: true }
+    );
+  } catch (error) {
+    console.error(`[USAGE LOG ERROR] ${error.message}`);
+  }
+};
+
+// Safe Text Extractor
+const extractText = (response) => {
+  try {
+    if (typeof response.text === 'function') return response.text();
+    if (response.candidates?.[0]?.content?.parts) {
+      return response.candidates[0].content.parts.find(p => p.text)?.text || "";
+    }
+  } catch (e) {
+    console.warn("[TEXT EXTRACTION] Failed:", e.message);
+  }
+  return "";
+};
+
 // Get all chat sessions (summary)
 router.post("/", optionalVerifyToken, identifyGuest, async (req, res) => {
   const { content, history, systemInstruction, image, video, document, language, model, mode, sessionId, agentType } = req.body;
+<<<<<<< HEAD
+=======
+  const isDeepSearch = req.body.isDeepSearch || (systemInstruction && systemInstruction.includes('DEEP SEARCH MODE ENABLED'));
+
+  let detectedMode = mode; // Pre-define for catch block accessibility
+  let finalResponse = {}; // Initialize early for tool calls
+  let reply = ""; // Declare reply at route level
+>>>>>>> ae32634a141c28c68e55eb8bf1a7edbf0cdfbebf
 
   try {
     // Enforce limits for guests
     const limitCheck = await checkGuestLimits(req, sessionId);
     if (!limitCheck.allowed) {
       return res.status(403).json({ error: "LIMIT_REACHED", reason: limitCheck.reason });
+    }
+
+    // --- OPENAI PROVIDER DETECTION ---
+    let agentName = agentType || 'AISA';
+    const targetAgent = await Agent.findOne({
+      $or: [
+        { agentName: agentName },
+        { agentName: agentName.toUpperCase() },
+        { slug: agentName.toLowerCase() }
+      ]
+    });
+
+    if (targetAgent && targetAgent.provider === 'openai') {
+      try {
+        console.log(`[CHAT] Routing to OpenAI for agent: ${targetAgent.agentName}`);
+
+        let openaiReply = "";
+        const modelMapping = targetAgent.modelMapping || 'gpt-4.1';
+
+        // 1. IMAGE GENERATION (DALL-E)
+        if (detectedMode === 'IMAGE_GEN') {
+          openaiReply = await openaiService.generateImage(content, 'gpt-image-1');
+          await logUsage(req.user?.id || 'guest', targetAgent._id, 0, 'Image Generation'); // DALL-E usage is not token-based
+          return res.status(200).json({ reply: "I've generated the image you requested.", imageUrl: openaiReply });
+        }
+
+        // 2. VISION ANALYSIS
+        else if (targetAgent.slug === 'tool-openai-vision' && image) {
+          const firstImg = Array.isArray(image) ? image[0] : image;
+          const imageUrl = firstImg.url || `data:${firstImg.mimeType};base64,${firstImg.base64Data}`;
+          const result = await openaiService.visionAnalysis(imageUrl, content || "Analyze this image", modelMapping);
+
+          await logUsage(req.user?.id || 'guest', targetAgent._id, result.usage?.total_tokens, 'Vision Analysis');
+          return res.status(200).json({ reply: result.content });
+        }
+
+        // 3. VOICE NARRATION (TTS)
+        else if (targetAgent.slug === 'tool-openai-tts') {
+          const audioBuffer = await openaiService.textToSpeech(content, modelMapping);
+          const base64Audio = audioBuffer.toString('base64');
+          await logUsage(req.user?.id || 'guest', targetAgent._id, 0, 'Text-to-Speech'); // TTS usage is not token-based
+          return res.status(200).json({
+            reply: "Here is your audio narration.",
+            audioUrl: `data:audio/mpeg;base64,${base64Audio}`
+          });
+        }
+
+        // 4. AUDIO TRANSCRIBER (STT)
+        else if (targetAgent.slug === 'tool-openai-stt' && allAttachments.length > 0) {
+          const audioFile = allAttachments.find(a => a.mimeType?.startsWith('audio/') || a.name?.endsWith('.mp3') || a.name?.endsWith('.wav'));
+          if (audioFile) {
+            const buffer = Buffer.from(audioFile.base64Data, 'base64');
+            const text = await openaiService.speechToText(buffer, modelMapping);
+            await logUsage(req.user?.id || 'guest', targetAgent._id, 0, 'Speech-to-Text'); // STT usage is not token-based
+            return res.status(200).json({ reply: `### Transcription:\n\n${text}` });
+          }
+        }
+
+        // 5. DOCUMENT INTELLIGENCE
+        else if (targetAgent.slug === 'tool-openai-document' && document) {
+          // For now, we use the pre-extracted text logic if available in parts, 
+          // or we can pass a summary prompt. OpenAI doesn't natively "read" PDFs like Gemini yet in the chat completions API 
+          // without assistants API, so we rely on the text extracted by mammoth/PDF parsers in chatRoutes.
+          const result = await openaiService.generateContent(content, modelMapping);
+          await logUsage(req.user?.id || 'guest', targetAgent._id, result.usage?.total_tokens, 'Document Intelligence');
+          return res.status(200).json({ reply: result.content });
+        }
+
+        // 6. STANDARD CHAT / CONTENT WRITER / CODE ASSISTANT
+        else {
+          const result = await openaiService.generateContent(content, modelMapping);
+          openaiReply = result.content;
+
+          // Log Usage
+          await logUsage(req.user?.id || 'guest', targetAgent._id, result.usage?.total_tokens, 'Standard Chat');
+
+          return res.status(200).json({ reply: openaiReply });
+        }
+      } catch (openaiErr) {
+        console.error("[CHAT] OpenAI Routing failed:", openaiErr.message);
+        // Fallback to Gemini if OpenAI fails
+      }
     }
 
     // --- MULTI-MODEL DISPATCHER ---
@@ -111,18 +236,38 @@ router.post("/", optionalVerifyToken, identifyGuest, async (req, res) => {
     if (Array.isArray(video)) allAttachments.push(...video);
     else if (video) allAttachments.push(video);
 
-    let detectedMode = mode || detectMode(content, allAttachments);
+    detectedMode = mode || detectMode(content, allAttachments);
     if (detectedMode === 'DOCUMENT_CONVERT') detectedMode = 'FILE_CONVERSION';
 
-    // Check if mode was explicitly provided by the user (tool selected)
     const isExplicit = !!mode;
+    agentName = agentType || 'AISA';
+    const agentCategory = req.body.agentCategory || 'General';
+
+    // Force mode if using a specialized agent but detection failed
+    if (detectedMode === 'NORMAL_CHAT') {
+      const lowerAgentName = agentName.toLowerCase();
+      if (lowerAgentName.includes('video')) {
+        detectedMode = 'VIDEO_GEN';
+      } else if (lowerAgentName.includes('image')) {
+        // Distinguish between generate and edit
+        if (lowerAgentName.includes('edit') || lowerAgentName.includes('modify')) {
+          detectedMode = 'IMAGE_EDIT';
+        } else {
+          detectedMode = 'IMAGE_GEN';
+        }
+      } else if (lowerAgentName.includes('music') || lowerAgentName.includes('lyria') || lowerAgentName.includes('audio')) {
+        detectedMode = 'AUDIO_GEN';
+      }
+    }
 
     const modeSystemInstruction = getModeSystemInstruction(detectedMode, language || 'English', {
       fileCount: allAttachments.length,
-      isExplicit // Pass flag to control explanation vs strict JSON
+      isExplicit, // Pass flag to control explanation vs strict JSON
+      agentName,
+      agentCategory
     });
 
-    console.log(`[MODE DETECTION] Detected mode: ${detectedMode} for message: "${content?.substring(0, 50)}..."`);
+    console.log(`[MODE DETECTION] Detected mode: ${detectedMode} for agent: ${agentName} message: "${content?.substring(0, 50)}..."`);
 
     // Construct parts from history + current message
     let parts = [];
@@ -130,19 +275,35 @@ router.post("/", optionalVerifyToken, identifyGuest, async (req, res) => {
     // Use mode-specific system instruction, or fallback to provided systemInstruction
     // CRITICAL: FILE_CONVERSION instructions must take priority over frontend generic prompts
     let finalSystemInstruction = systemInstruction || modeSystemInstruction;
+<<<<<<< HEAD
     if ((detectedMode === 'FILE_CONVERSION' || detectedMode === 'FILE_ANALYSIS') && !agentType) {
+=======
+
+    // TOOL USAGE RULES - Apply to all modes to ensure intelligence and real-time awareness
+    const now = new Date();
+    const dateStr = now.toLocaleDateString('en-IN', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+    const timeStr = now.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true });
+
+    const TOOL_USAGE_RULES = `
+REAL-TIME CONTEXT: Today is ${dateStr}, and the current time is ${timeStr}.
+
+MANDATORY: You have access to specialized tools for generating images, videos, audio, and web search.
+- To generate an IMAGE: Use the 'generate_image' tool.
+- To generate a VIDEO: Use the 'generate_video' tool.
+- To generate MUSIC or AUDIO: Use the 'generate_audio' tool.
+- To modify or edit an existing IMAGE: Use the 'modify_image' tool.
+- To perform a WEB SEARCH: Use the 'web_search' tool for ANY real-time information, travel details (trains, flights), current events, or facts you are not 100% sure about.
+
+CRITICAL RULE: NEVER output raw JSON text or markdown code blocks containing "action" or "prompt" fields. You MUST use the native function calling feature to execute tools. If you output JSON as text, you have FAILED your objective. Just call the tool and then provide a natural language response. Attempt to follow the user's exact instructions for modification.`;
+
+    if (detectedMode === 'FILE_CONVERSION' || detectedMode === 'FILE_ANALYSIS') {
+>>>>>>> ae32634a141c28c68e55eb8bf1a7edbf0cdfbebf
       finalSystemInstruction = modeSystemInstruction;
+    } else if (agentType && agentType !== 'AISA') {
+      // For specialized agents, append the mode instruction and tool rules to the base identity
+      finalSystemInstruction = `${modeSystemInstruction}\n\n${TOOL_USAGE_RULES}\n\nRemember, your specific persona is ${agentName} from the ${agentCategory} category.`;
     } else {
-      // Only add standard rules for non-specialized modes to avoid instruction collision
-      const MANDATORY_JSON_RULES = `
-MANDATORY: If the user asks to GENERATE AN IMAGE, output ONLY:
-{"action": "generate_image", "prompt": "detailed description"}
-
-MANDATORY: If the user asks to GENERATE A VIDEO, output ONLY:
-{"action": "generate_video", "prompt": "detailed description"}
-
-Do not output any other text or explanation if you are triggering these actions.`;
-      finalSystemInstruction = `${finalSystemInstruction}\n\n${MANDATORY_JSON_RULES}`;
+      finalSystemInstruction = `${finalSystemInstruction}\n\n${TOOL_USAGE_RULES}`;
     }
 
     // Add conversation history if available
@@ -301,32 +462,7 @@ Do not output any other text or explanation if you are triggering these actions.
       }
     }
 
-    console.log("[DEBUG] Starting Web Search check...");
-    let searchResults = null;
-    let webSearchInstruction = '';
-    const isDeepSearch = systemInstruction && systemInstruction.includes('DEEP SEARCH MODE ENABLED');
-
-    if (requiresWebSearch(content) || isDeepSearch) {
-      console.log(`[WEB SEARCH] Query requires real-time information${isDeepSearch ? ' (Forced by Deep Search)' : ''}`);
-      try {
-        const searchQuery = extractSearchQuery(content);
-        console.log(`[WEB SEARCH] Searching for: "${searchQuery}"`);
-
-        const rawSearchData = await performWebSearch(searchQuery, isDeepSearch ? 10 : 5);
-        if (rawSearchData) {
-          const limit = isDeepSearch ? 10 : 5;
-          searchResults = processSearchResults(rawSearchData, limit);
-          console.log(`[WEB SEARCH] Found ${searchResults.snippets.length} results`);
-
-          webSearchInstruction = getWebSearchSystemInstruction(searchResults, language || 'English', isDeepSearch);
-          parts.push({ text: `[WEB SEARCH RESULTS]:\n${JSON.stringify(searchResults.snippets)}` });
-          parts.push({ text: `[SEARCH INSTRUCTION]: ${webSearchInstruction}` });
-        }
-      } catch (error) {
-        console.error('[WEB SEARCH ERROR]', error);
-      }
-    }
-    console.log("[DEBUG] Web Search check complete.");
+    console.log("[DEBUG] Web Search check skipped (using Native Function Calling)...");
 
     // File Conversion: Check if this is a conversion request
     let conversionResult = null;
@@ -505,7 +641,6 @@ Do not output any other text or explanation if you are triggering these actions.
     // Correct usage for single-turn content generation with this SDK
     const contentPayload = { role: "user", parts: parts };
 
-    let reply = "";
     let retryCount = 0;
     const maxRetries = 3;
 
@@ -515,35 +650,252 @@ Do not output any other text or explanation if you are triggering these actions.
       const tryModel = async (mName) => {
         try {
           console.log(`[GEMINI] Trying model: ${mName}`);
-          // Always create fresh model instance with correct system instruction
+
+          // Use provided tools for all requests to ensure Vertex AI can trigger them natively
           const model = genAIInstance.getGenerativeModel({
             model: mName,
-            systemInstruction: finalSystemInstruction
+            systemInstruction: finalSystemInstruction,
+            tools: toolDeclarations,
+            safetySettings: [
+              { category: HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT, threshold: HarmBlockThreshold.BLOCK_ONLY_HIGH },
+              { category: HarmCategory.HARM_CATEGORY_HARASSMENT, threshold: HarmBlockThreshold.BLOCK_ONLY_HIGH },
+              { category: HarmCategory.HARM_CATEGORY_HATE_SPEECH, threshold: HarmBlockThreshold.BLOCK_ONLY_HIGH },
+              { category: HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT, threshold: HarmBlockThreshold.BLOCK_ONLY_HIGH }
+            ]
           });
 
-          // Add timeout to prevent hanging (increased to 45s for better reliability)
-          const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error("Timeout")), 45000));
-          const resultPromise = model.generateContent({ contents: [contentPayload] });
-
-          const result = await Promise.race([resultPromise, timeoutPromise]);
+          const result = await model.generateContent({ contents: [contentPayload] });
           const response = await result.response;
+
+          const parts = response.candidates[0].content.parts;
+
+          // Check for Tool Calls (Function Calling)
+          const functionCalls = parts.filter(p => p.functionCall);
+
+          if (functionCalls.length > 0) {
+            console.log(`[VERTEX TOOLS] Model requested ${functionCalls.length} tool calls.`);
+
+            for (const fc of functionCalls) {
+              const { name, args } = fc.functionCall;
+              console.log(`[VERTEX TOOLS] Executing tool: ${name}`, args);
+
+              if (name === 'generate_image') {
+                try {
+                  const imageUrl = await generateImageFromPrompt(args.prompt);
+                  if (imageUrl) {
+                    finalResponse.imageUrl = imageUrl;
+                    // Narrative from Vertex AI
+                    try {
+                      const narrModel = genAIInstance.getGenerativeModel({ model: primaryModelName, systemInstruction: finalSystemInstruction });
+                      const narrRes = await narrModel.generateContent({
+                        contents: [{ role: 'user', parts: [{ text: `I have successfully generated an image for: "${args.prompt}". Tell the user it's ready.` }] }]
+                      });
+                      reply = extractText(narrRes.response);
+                    } catch (err) {
+                      reply = `I've generated the image for: "${args.prompt}"`;
+                    }
+                  }
+                } catch (e) { console.error("[TOOL ERROR] generate_image:", e.message); }
+              }
+              else if (name === 'generate_video') {
+                try {
+                  const videoUrl = await generateVideoFromPrompt(args.prompt, 5, 'medium');
+                  if (videoUrl) {
+                    finalResponse.videoUrl = videoUrl;
+                    // Narrative from Vertex AI
+                    try {
+                      const narrModel = genAIInstance.getGenerativeModel({ model: primaryModelName, systemInstruction: finalSystemInstruction });
+                      const narrRes = await narrModel.generateContent({
+                        contents: [{ role: 'user', parts: [{ text: `I have successfully generated a video for: "${args.prompt}". Tell the user it's ready.` }] }]
+                      });
+                      reply = extractText(narrRes.response);
+                    } catch (err) {
+                      reply = `I've generated the video for: "${args.prompt}"`;
+                    }
+                  }
+                } catch (e) { console.error("[TOOL ERROR] generate_video:", e.message); }
+              }
+              else if (name === 'modify_image') {
+                try {
+                  console.log(`[IMAGE EDIT TOOL] Triggered natively for: ${args.prompt}`);
+
+                  // Extract base64 image: Current message first, then History search
+                  let firstImgObj = (Array.isArray(image) ? image[0] : image) || allAttachments.find(a => a.mimeType?.startsWith('image/') || a.type === 'image');
+
+                  if (!firstImgObj && history && Array.isArray(history)) {
+                    for (let i = history.length - 1; i >= 0; i--) {
+                      const msg = history[i];
+                      if (msg.attachments && Array.isArray(msg.attachments)) {
+                        const img = msg.attachments.find(a => a.type === 'image' || a.mimeType?.startsWith('image/'));
+                        if (img) { firstImgObj = img; break; }
+                      }
+                    }
+                  }
+
+                  const base64Img = firstImgObj?.base64Data || (typeof firstImgObj === 'string' ? firstImgObj : null);
+
+                  if (base64Img) {
+                    const imageUrl = await modifyImageFromPrompt(args.prompt, base64Img);
+                    if (imageUrl) {
+                      finalResponse.imageUrl = imageUrl;
+                      try {
+                        const narrModel = genAIInstance.getGenerativeModel({ model: primaryModelName, systemInstruction: finalSystemInstruction });
+                        const narrRes = await narrModel.generateContent({
+                          contents: [{ role: 'user', parts: [{ text: `I have successfully modified the image as requested: "${args.prompt}". Confirm it to the user.` }] }]
+                        });
+                        reply = extractText(narrRes.response);
+                      } catch (err) {
+                        reply = "I've successfully modified the image based on your request!";
+                      }
+                    }
+                  } else {
+                    reply = "I understand you want to edit an image, but I couldn't find the source image in our chat. Please upload an image and tell me what to change.";
+                  }
+                } catch (e) {
+                  console.error("[TOOL ERROR] modify_image:", e.message);
+                  reply = `I encountered an error while editing the image: ${e.message}`;
+                }
+              }
+              else if (name === 'generate_audio') {
+                try {
+                  const audioUrl = await generateMusicFromPrompt(args.prompt, args.duration || 30);
+                  if (audioUrl) {
+                    finalResponse.audioUrl = audioUrl;
+                    // Narrative from Vertex AI
+                    try {
+                      const narrModel = genAIInstance.getGenerativeModel({ model: primaryModelName, systemInstruction: finalSystemInstruction });
+                      const narrRes = await narrModel.generateContent({
+                        contents: [{ role: 'user', parts: [{ text: `I have successfully generated audio for: "${args.prompt}". Tell the user it's ready.` }] }]
+                      });
+                      reply = extractText(narrRes.response);
+                    } catch (err) {
+                      reply = `I've generated the music for: "${args.prompt}"`;
+                    }
+                  }
+                } catch (e) { console.error("[TOOL ERROR] generate_audio:", e.message); }
+              }
+              else if (name === 'web_search') {
+                try {
+                  const searchLimit = (typeof isDeepSearch !== 'undefined' && isDeepSearch) ? 10 : 5;
+                  const rawSearchData = await performWebSearch(args.query, searchLimit);
+
+                  let results = null;
+                  if (rawSearchData) {
+                    results = processSearchResults(rawSearchData, searchLimit);
+                  }
+
+                  // Detect mock results from search service
+                  const isMock = results?.snippets?.some(s => s.source === 'example.com' || s.snippet.includes('mock search result'));
+                  const hasResults = results && results.snippets && results.snippets.length > 0 && !isMock;
+
+                  // Resilient narration via Vertex AI
+                  const searchPrompt = hasResults
+                    ? `Based on these search results, answer the user's question accurately: "${content}"\n\nSearch Context:\n${JSON.stringify(results.snippets)}`
+                    : `Important: No real-time search data is available for this specific query right now. USE YOUR OWN INTERNAL KNOWLEDGE to answer the user's question accurately and helpfully: "${content}". Be descriptive and provide a high-quality answer.`;
+
+                  const narrationInstruction = hasResults
+                    ? getWebSearchSystemInstruction(results, language || 'English', isDeepSearch)
+                    : finalSystemInstruction;
+
+                  const searchSummaryModel = genAIInstance.getGenerativeModel({
+                    model: primaryModelName,
+                    systemInstruction: narrationInstruction
+                  });
+
+                  try {
+                    const summaryResult = await searchSummaryModel.generateContent({
+                      contents: [{ role: 'user', parts: [{ text: searchPrompt }] }]
+                    });
+                    const summaryResponse = await summaryResult.response;
+                    reply = extractText(summaryResponse);
+                  } catch (narrationErr) {
+                    console.error("[TOOL ERROR] Narration step failed:", narrationErr.message);
+                    const fallbackModel = genAIInstance.getGenerativeModel({ model: primaryModelName, systemInstruction: finalSystemInstruction });
+                    const fallbackResult = await fallbackModel.generateContent({
+                      contents: [{ role: 'user', parts: [{ text: `Answer this: ${content}` }] }]
+                    });
+                    reply = extractText(fallbackResult.response);
+                  }
+
+                  if (hasResults) {
+                    finalResponse.searchResults = results.snippets;
+                  }
+                } catch (e) {
+                  console.error("[TOOL ERROR] Web search flow failed completely:", e.message);
+                  try {
+                    const ultimateModel = genAIInstance.getGenerativeModel({ model: primaryModelName, systemInstruction: finalSystemInstruction });
+                    const ultimateResult = await ultimateModel.generateContent({
+                      contents: [{ role: 'user', parts: [{ text: content }] }]
+                    });
+                    reply = extractText(ultimateResult.response);
+                  } catch (err) {
+                    reply = "I'm sorry, I'm having trouble with my search tools right now. But I'm here to help with other things!";
+                  }
+                }
+              }
+              else if (name === 'file_conversion') {
+                // Trigger conversion logic if applicable (this requires attachment)
+                if (allAttachments.length > 0) {
+                  console.log("[FILE CONVERSION TOOL] Triggering conversion via native tool call");
+                  // This will be handled by the existing conversionResult logic if we set detectedMode
+                  detectedMode = 'FILE_CONVERSION';
+                  // In a real implementation, we'd call the conversion here and return the result
+                }
+              }
+              else if (name === 'set_reminder') {
+                try {
+                  console.log(`[REMINDER TOOL] Setting reminder: ${args.title} at ${args.datetime}`);
+                  const time = new Date(args.datetime).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true });
+
+                  // Narrative from Vertex AI
+                  try {
+                    const narrModel = genAIInstance.getGenerativeModel({ model: primaryModelName, systemInstruction: finalSystemInstruction });
+                    const narrRes = await narrModel.generateContent({
+                      contents: [{ role: 'user', parts: [{ text: `I have set a reminder for "${args.title}" at ${time}. Confirm this to the user in their language (be friendly).` }] }]
+                    });
+                    reply = extractText(narrRes.response);
+                  } catch (err) {
+                    if (detectedLanguage === 'Hinglish' || detectedLanguage === 'Hindi') {
+                      reply = `Theek hai, main ${time} par "${args.title}" ke liye reminder set kar dungi.`;
+                    } else {
+                      reply = `Okay, I've set a reminder for "${args.title}" at ${time}.`;
+                    }
+                  }
+                } catch (e) { console.error("[TOOL ERROR] set_reminder:", e.message); }
+              }
+            }
+          }
+
+          // Extract Text
           let text = '';
           if (typeof response.text === 'function') {
-            text = response.text();
-          } else if (response.candidates && response.candidates[0]?.content?.parts?.[0]?.text) {
-            text = response.candidates[0].content.parts[0].text;
+            try { text = response.text(); } catch (e) { /* ignore if text() fails due to no text parts */ }
           }
+
+          if (!text && response.candidates && response.candidates[0]?.content?.parts) {
+            text = response.candidates[0].content.parts.find(p => p.text)?.text || "";
+          }
+
           if (text) return text;
+
+          // If no text but we triggered tools, and we set a custom reply (like in web_search or set_reminder)
+          // Look for 'reply' set during tool execution (wait, 'reply' is outer scope)
+          if (functionCalls.length > 0 && reply) {
+            return reply;
+          }
+
+          if (functionCalls.length > 0) {
+            return "I've processed your request using my specialized tools.";
+          }
+
           throw new Error("Empty response");
         } catch (mErr) {
           console.error(`[GEMINI] Model ${mName} failed:`, mErr.message);
-          console.error(`[GEMINI ERROR OBJECT]:`, JSON.stringify(mErr, null, 2));
           throw mErr;
         }
       };
 
       try {
-        // Use the model from vertex.js config
         return await tryModel(primaryModelName);
       } catch (err) {
         throw new Error(`Model generation failed: ${err.message}`);
@@ -576,159 +928,242 @@ Do not output any other text or explanation if you are triggering these actions.
       reply = "I understood your request but couldn't generate a text response.";
     }
 
-    // Construct final response object
-    const finalResponse = {
-      reply,
-      detectedMode,
-      language: detectedLanguage || language || 'English'
-    };
+    // Construct/Update final response object
+    finalResponse.reply = reply;
+    finalResponse.detectedMode = detectedMode;
+    finalResponse.language = detectedLanguage || language || 'English';
 
     // Check for Media (Video/Image) Generation Action
     // Check for Media (Video/Image) Generation Action
     try {
-      console.log(`[MEDIA GEN] Analyzing reply: "${reply.substring(0, 100)}..."`);
+      if (detectedMode === 'IMAGE_GEN' || detectedMode === 'VIDEO_GEN' || detectedMode === 'IMAGE_EDIT' || detectedMode === 'AUDIO_GEN') {
+        console.log(`[MEDIA GEN] Analyzing reply: "${reply.substring(0, 100)}..."`);
 
-      // Helper to extract JSON object with balanced braces
-      const extractActionJson = (text) => {
-        // 1. Try to anchor on "action": "..." (support single/double quotes)
-        // We match strictly to avoid false positives, but allow slight whitespace variance
-        const anchorRegex = /["']action["']\s*:\s*["'](generate_video|generate_image)["']/;
-        const actionMatch = text.match(anchorRegex);
+        // Helper to extract JSON object with balanced braces
+        const extractActionJson = (text) => {
+          // 1. Try to anchor on "action": "..." (support single/double quotes)
+          // We match strictly to avoid false positives, but allow slight whitespace variance
+          const anchorRegex = /["']action["']\s*:\s*["'](generate_video|generate_image|modify_image|generate_audio)["']/;
+          const actionMatch = text.match(anchorRegex);
 
-        if (actionMatch) {
-          const actionIndex = actionMatch.index;
-          // Find the starting brace '{' before the action
-          let startIndex = text.lastIndexOf('{', actionIndex);
+          if (actionMatch) {
+            const actionIndex = actionMatch.index;
+            // Find the starting brace '{' before the action
+            let startIndex = text.lastIndexOf('{', actionIndex);
 
-          if (startIndex !== -1) {
-            // Attempt balanced brace counting
-            let openBraces = 0;
-            let endIndex = -1;
-            let inString = false;
-            let escape = false;
+            if (startIndex !== -1) {
+              // Attempt balanced brace counting
+              let openBraces = 0;
+              let endIndex = -1;
+              let inString = false;
+              let escape = false;
 
-            for (let i = startIndex; i < text.length; i++) {
-              const char = text[i];
-              if (escape) { escape = false; continue; }
-              if (char === '\\') { escape = true; continue; }
-              if (char === '"' || char === "'") { inString = !inString; continue; } // Simplistic quote handling
+              for (let i = startIndex; i < text.length; i++) {
+                const char = text[i];
+                if (escape) { escape = false; continue; }
+                if (char === '\\') { escape = true; continue; }
+                if (char === '"' || char === "'") { inString = !inString; continue; } // Simplistic quote handling
 
-              if (!inString) {
-                if (char === '{') {
-                  openBraces++;
-                } else if (char === '}') {
-                  openBraces--;
-                  if (openBraces === 0) {
-                    endIndex = i + 1;
+                if (!inString) {
+                  if (char === '{') {
+                    openBraces++;
+                  } else if (char === '}') {
+                    openBraces--;
+                    if (openBraces === 0) {
+                      endIndex = i + 1;
+                      break;
+                    }
+                  }
+                }
+              }
+
+              if (endIndex !== -1) {
+                const jsonStr = text.substring(startIndex, endIndex);
+                try {
+                  const parsed = JSON.parse(jsonStr); // Strict JSON header check
+                  return { data: parsed, raw: jsonStr };
+                } catch (e) {
+                  console.warn("[MEDIA GEN] JSON parse failed, attempting manual field extraction...");
+                  // Handle malformed JSON from AI (e.g. missing quotes)
+                  const actionMatch = jsonStr.match(/["']action["']\s*:\s*["'](generate_video|generate_image|modify_image|generate_audio)["']/);
+                  const promptMatch = jsonStr.match(/["']prompt["']\s*:\s*["']([\s\S]*?)(?=["']\s*,\s*["']|["']\s*\}|$)/) || jsonStr.match(/["']prompt["']\s*:\s*([\s\S]*?)(?=\s*,\s*["']|\s*\}|$)/);
+
+                  if (actionMatch && promptMatch) {
+                    const action = actionMatch[1];
+                    let prompt = promptMatch[1].trim();
+                    // Clean up trailing quotes if present
+                    if (prompt.endsWith('"') || prompt.endsWith("'")) prompt = prompt.slice(0, -1);
+
+                    return {
+                      data: { action, prompt, duration: 30 },
+                      raw: jsonStr
+                    };
+                  }
+                }
+              }
+            }
+          }
+
+          // 2. Fallback: classic greedy Regex (works for 99% of simple cases)
+          // Matches { ... "action": "generate_video" ... }
+          const simpleRegex = /\{[\s\S]*?["']action["']\s*:\s*["'](generate_video|generate_image|modify_image|generate_audio)["'][\s\S]*?\}/;
+          const simpleMatch = text.match(simpleRegex);
+          if (simpleMatch) {
+            try {
+              return { data: JSON.parse(simpleMatch[0]), raw: simpleMatch[0] };
+            } catch (e) {
+              console.error("[MEDIA GEN] Fallback regex matched but parse failed:", e.message);
+            }
+          }
+
+          // 3. Fallback for Array format [ { ... } ]
+          const arrayRegex = /\[\s*\{[\s\S]*?["']action["']\s*:\s*["'](generate_video|generate_image|modify_image|generate_audio)["'][\s\S]*?\}\s*\]/;
+          const arrayMatch = text.match(arrayRegex);
+          if (arrayMatch) {
+            try {
+              const arr = JSON.parse(arrayMatch[0]);
+              if (Array.isArray(arr) && arr[0]) {
+                return { data: arr[0], raw: arrayMatch[0] };
+              }
+            } catch (e) {
+              console.error("[MEDIA GEN] Array regex matched but parse failed:", e.message);
+            }
+          }
+
+          return null;
+        };
+
+        const extracted = extractActionJson(reply);
+
+        if (extracted) {
+          const { data, raw } = extracted;
+          console.log(`[MEDIA GEN] Found trigger JSON: ${raw}`);
+
+          // REMOVE processed JSON from the reply text immediately
+          // Also handle markdown code block wrappers if they exist
+          const markdownWrapperRegex = new RegExp(`\`\`\`(?:json|text|plain)?\\s*${raw.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s*\`\`\``, 'g');
+          if (markdownWrapperRegex.test(reply)) {
+            reply = reply.replace(markdownWrapperRegex, '').trim();
+          } else {
+            reply = reply.replace(raw, '').trim();
+          }
+
+          if (data.action === 'generate_video' && data.prompt) {
+            console.log(`[VIDEO GEN] Calling generator for: ${data.prompt}`);
+            const videoUrl = await generateVideoFromPrompt(data.prompt, 5, 'medium');
+            if (videoUrl) {
+              finalResponse.videoUrl = videoUrl;
+              finalResponse.reply = (reply && reply.trim()) ? reply : `Sure, I've generated a video based on your request: "${data.prompt.substring(0, 50)}..."`;
+            } else {
+              finalResponse.reply = (reply && reply.trim()) ? reply : "I attempted to generate a video but encountered an error.";
+            }
+          }
+          else if (data.action === 'generate_image' && data.prompt) {
+            console.log(`[IMAGE GEN] Calling generator for: ${data.prompt}`);
+            // Use a shorter version of prompt for Fallback just in case
+            const safePrompt = data.prompt.length > 400 ? data.prompt.substring(0, 400) : data.prompt;
+
+            try {
+              const imageUrl = await generateImageFromPrompt(data.prompt);
+              if (imageUrl) {
+                finalResponse.imageUrl = imageUrl;
+                finalResponse.reply = (reply && reply.trim()) ? reply : "Here is the image you requested.";
+              }
+            } catch (imgError) {
+              console.error(`[IMAGE GEN] Vertex AI failed:`, imgError.message);
+              // Return error message to user instead of using Pollinations
+              finalResponse.reply = `I encountered an error generating the image: ${imgError.message}. Please check your Vertex AI configuration or try again.`;
+            }
+          }
+          else if (data.action === 'modify_image' && data.prompt) {
+            console.log(`[IMAGE EDIT] Calling modifier for: ${data.prompt}`);
+            // Extract base64 image: Current message first, then History search
+            let firstImgObj = (Array.isArray(image) ? image[0] : image) || allAttachments.find(a => a.mimeType?.startsWith('image/') || a.type === 'image');
+
+            // If not in current message, search history (start from most recent)
+            if (!firstImgObj && history && Array.isArray(history)) {
+              console.log("[IMAGE EDIT] Searching history for source image...");
+              for (let i = history.length - 1; i >= 0; i--) {
+                const msg = history[i];
+                if (msg.attachments && Array.isArray(msg.attachments)) {
+                  const img = msg.attachments.find(a => a.type === 'image' || a.mimeType?.startsWith('image/'));
+                  if (img) {
+                    firstImgObj = img;
+                    console.log(`[IMAGE EDIT] Found source image in history: ${img.name || 'unnamed'}`);
                     break;
                   }
                 }
               }
             }
 
-            if (endIndex !== -1) {
-              const jsonStr = text.substring(startIndex, endIndex);
+            const base64Img = firstImgObj?.base64Data || (typeof firstImgObj === 'string' ? firstImgObj : null);
+
+            if (base64Img) {
               try {
-                const parsed = JSON.parse(jsonStr); // Strict JSON header check
-                return { data: parsed, raw: jsonStr };
-              } catch (e) {
-                // Try loose parsing (e.g. if keys are not quoted or single quoted)
-                // We can't use eval safely, but we can try simple regex extraction if strict parse failed
-                console.warn("[MEDIA GEN] Strict JSON parse failed, trying fallback regex extraction...");
+                const imageUrl = await modifyImageFromPrompt(data.prompt, base64Img);
+                if (imageUrl) {
+                  finalResponse.imageUrl = imageUrl;
+                  // Narrative from Vertex AI
+                  try {
+                    const narrModel = genAIInstance.getGenerativeModel({ model: primaryModelName, systemInstruction: finalSystemInstruction });
+                    const narrRes = await narrModel.generateContent({
+                      contents: [{ role: 'user', parts: [{ text: `I have successfully modified the image as requested: "${data.prompt}". Confirm to the user that changes are applied.` }] }]
+                    });
+                    reply = extractText(narrRes.response);
+                    finalResponse.reply = reply;
+                  } catch (err) {
+                    finalResponse.reply = (reply && reply.trim()) ? reply : "I've successfully modified the image based on your request!";
+                  }
+                }
+              } catch (editError) {
+                console.error(`[IMAGE EDIT] Vertex AI failed:`, editError.stack || editError.message);
+                finalResponse.reply = `I encountered an error while editing the image: ${editError.message}. Please try again later.`;
               }
+            } else {
+              console.warn("[IMAGE EDIT] Attempted but NO base64 image found in attachments.");
+              finalResponse.reply = "I understand you want to edit an image, but I couldn't find the source image in your message. Please upload an image and tell me what to change.";
+            }
+          }
+          else if (data.action === 'generate_audio' && data.prompt) {
+            console.log(`[AUDIO GEN] Triggered for music: ${data.prompt}`);
+            try {
+              const audioUrl = await generateMusicFromPrompt(data.prompt, 30);
+              if (audioUrl) {
+                finalResponse.audioUrl = audioUrl;
+                console.log(`[AUDIO GEN] Success! Audio URL: ${audioUrl}`);
+                finalResponse.reply = (reply && reply.trim()) ? reply : `I've generated some high-fidelity music based on your request using Google's Lyria model. 🎵\n\n**Music Style**: ${data.prompt.substring(0, 100)}...`;
+              } else {
+                finalResponse.reply = "I attempted to generate music but couldn't get the audio data. Please try a different prompt.";
+              }
+            } catch (musicError) {
+              console.error(`[AUDIO GEN] Lyria failed:`, musicError.message);
+              finalResponse.reply = `I encountered an error while generating music: ${musicError.message}. This model may still be in limited preview in your region.`;
             }
           }
         }
 
-        // 2. Fallback: classic greedy Regex (works for 99% of simple cases)
-        // Matches { ... "action": "generate_video" ... }
-        const simpleRegex = /\{[\s\S]*?["']action["']\s*:\s*["'](generate_video|generate_image)["'][\s\S]*?\}/;
-        const simpleMatch = text.match(simpleRegex);
-        if (simpleMatch) {
-          try {
-            return { data: JSON.parse(simpleMatch[0]), raw: simpleMatch[0] };
-          } catch (e) {
-            console.error("[MEDIA GEN] Fallback regex matched but parse failed:", e.message);
+        // 2. Check for Markdown Image triggers (Support frontend instructions)
+        if (!finalResponse.imageUrl) {
+          const mdImageRegex = /!\[Image\]\((https:\/\/image\.pollinations\.ai\/prompt\/([^?)]+)[^)]*)\)/;
+          const mdMatch = reply.match(mdImageRegex);
+          if (mdMatch) {
+            console.log("[MEDIA GEN] Found Pollinations markdown trigger.");
+            finalResponse.imageUrl = mdMatch[1];
+            // Remove the markdown tag from text to avoid double display
+            reply = reply.replace(mdMatch[0], '').trim();
+            finalResponse.reply = (reply && reply.trim()) ? reply : "Here is the image you requested.";
           }
         }
 
-        // 3. Fallback for Array format [ { ... } ]
-        const arrayRegex = /\[\s*\{[\s\S]*?["']action["']\s*:\s*["'](generate_video|generate_image)["'][\s\S]*?\}\s*\]/;
-        const arrayMatch = text.match(arrayRegex);
-        if (arrayMatch) {
-          try {
-            const arr = JSON.parse(arrayMatch[0]);
-            if (Array.isArray(arr) && arr[0]) {
-              return { data: arr[0], raw: arrayMatch[0] };
-            }
-          } catch (e) {
-            console.error("[MEDIA GEN] Array regex matched but parse failed:", e.message);
-          }
-        }
-
-        return null;
-      };
-
-      const extracted = extractActionJson(reply);
-
-      if (extracted) {
-        const { data, raw } = extracted;
-        console.log(`[MEDIA GEN] Found trigger JSON: ${raw}`);
-
-        // REMOVE processed JSON from the reply text immediately
-        reply = reply.replace(raw, '').trim();
-
-        if (data.action === 'generate_video' && data.prompt) {
-          console.log(`[VIDEO GEN] Calling generator for: ${data.prompt}`);
-          const videoUrl = await generateVideoFromPrompt(data.prompt, 5, 'medium');
-          if (videoUrl) {
-            finalResponse.videoUrl = videoUrl;
-            finalResponse.reply = (reply && reply.trim()) ? reply : `Sure, I've generated a video based on your request: "${data.prompt.substring(0, 50)}..."`;
-          } else {
-            finalResponse.reply = (reply && reply.trim()) ? reply : "I attempted to generate a video but encountered an error.";
-          }
-        }
-        else if (data.action === 'generate_image' && data.prompt) {
-          console.log(`[IMAGE GEN] Calling generator for: ${data.prompt}`);
-          // Use a shorter version of prompt for Fallback just in case
-          const safePrompt = data.prompt.length > 400 ? data.prompt.substring(0, 400) : data.prompt;
-
-          try {
-            const imageUrl = await generateImageFromPrompt(data.prompt);
-            if (imageUrl) {
-              finalResponse.imageUrl = imageUrl;
-              finalResponse.reply = (reply && reply.trim()) ? reply : "Here is the image you requested.";
-            }
-          } catch (imgError) {
-            console.error(`[IMAGE GEN] Vertex AI failed:`, imgError.message);
-            // Return error message to user instead of using Pollinations
-            finalResponse.reply = `I encountered an error generating the image: ${imgError.message}. Please check your Vertex AI configuration or try again.`;
-          }
+        // Final cleanup: Remove backticks and language tags if the model output the JSON inside a code block
+        reply = reply.replace(/```json\s*|```text\s*|```plain\s*|```\s*/g, '').replace(/```/g, '').trim();
+        // Ensure finalResponse.reply has a value if we didn't hit the blocks above
+        if (!finalResponse.reply && !finalResponse.imageUrl && !finalResponse.videoUrl) {
+          finalResponse.reply = reply || "Processed your request.";
+        } else if (!finalResponse.reply) {
+          finalResponse.reply = reply; // Sync back just in case
         }
       }
-
-      // 2. Check for Markdown Image triggers (Support frontend instructions)
-      if (!finalResponse.imageUrl) {
-        const mdImageRegex = /!\[Image\]\((https:\/\/image\.pollinations\.ai\/prompt\/([^?)]+)[^)]*)\)/;
-        const mdMatch = reply.match(mdImageRegex);
-        if (mdMatch) {
-          console.log("[MEDIA GEN] Found Pollinations markdown trigger.");
-          finalResponse.imageUrl = mdMatch[1];
-          // Remove the markdown tag from text to avoid double display
-          reply = reply.replace(mdMatch[0], '').trim();
-          finalResponse.reply = (reply && reply.trim()) ? reply : "Here is the image you requested.";
-        }
-      }
-
-      // Final cleanup: Remove backticks if the model output the JSON inside a code block
-      reply = reply.replace(/```json\s*```|```\s*```/g, '').trim();
-      // Ensure finalResponse.reply has a value if we didn't hit the blocks above
-      if (!finalResponse.reply && !finalResponse.imageUrl && !finalResponse.videoUrl) {
-        finalResponse.reply = reply || "Processed your request.";
-      } else if (!finalResponse.reply) {
-        finalResponse.reply = reply; // Sync back just in case
-      }
-
     } catch (e) {
       console.warn("[MEDIA GEN] Critical failure in media handling logic:", e);
     }
@@ -790,7 +1225,16 @@ Stack: ${err.stack}
       });
     }
 
-    return res.status(statusCode).json({ error: "AI failed to respond", details: err.message });
+    // Improved error reporting for UI
+    const errorDetails = err.message || "Unknown AI error";
+    const userFriendlyMessage = `System Message: AI failed to respond - ${errorDetails}. Please try again later or check your network.`;
+
+    return res.status(200).json({
+      success: true,
+      reply: userFriendlyMessage,
+      error: "AI failed to respond",
+      details: errorDetails
+    });
   }
 });
 // Get all chat sessions (summary) for the authenticated user or guest
@@ -1147,8 +1591,19 @@ router.patch('/:sessionId/message/:messageId', optionalVerifyToken, identifyGues
     res.json(updatedSession);
 
   } catch (err) {
-    console.error(`[UPDATE MSG ERROR] ${err.message}`);
-    res.status(500).json({ error: 'Failed to update message' });
+    console.error(`[CHAT ERROR] ${err.message}`);
+    const statusCode = err.status || 200; // Return 200 with error message for better UI handling
+
+    // Improved error reporting for UI
+    const errorDetails = err.message || "Unknown AI error";
+    const userFriendlyMessage = `System Message: AI failed to respond - ${errorDetails}. Please try again later or check your network.`;
+
+    res.status(statusCode).json({
+      success: true,
+      reply: userFriendlyMessage,
+      error: "AI failed to respond",
+      details: errorDetails
+    });
   }
 });
 
