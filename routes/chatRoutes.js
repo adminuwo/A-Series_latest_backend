@@ -19,6 +19,10 @@ import { generateVideoFromPrompt } from "../controllers/videoController.js";
 import { generateImageFromPrompt, modifyImageFromPrompt } from "../controllers/image.controller.js";
 import { generateMusicFromPrompt } from "../controllers/music.controller.js";
 
+import openaiService from "../services/openaiService.js";
+import Agent from "../models/Agents.js";
+import UsageTracking from "../models/UsageTracking.js";
+
 import axios from "axios";
 
 
@@ -27,6 +31,22 @@ const router = express.Router();
 // Helper to check guest limits
 const checkGuestLimits = async (req, sessionId) => {
   return { allowed: true };
+};
+
+const logUsage = async (userId, agentId, tokensUsed = 0, featureName = '') => {
+  try {
+    await UsageTracking.findOneAndUpdate(
+      { userId, agentId },
+      {
+        $inc: { tokensUsed, messagesSent: 1 },
+        $set: { lastUsed: new Date(), provider: 'openai' },
+        $push: { featuresUsed: { name: featureName, timestamp: new Date() } }
+      },
+      { upsert: true, new: true }
+    );
+  } catch (error) {
+    console.error(`[USAGE LOG ERROR] ${error.message}`);
+  }
 };
 
 // Safe Text Extractor
@@ -56,6 +76,88 @@ router.post("/", optionalVerifyToken, identifyGuest, async (req, res) => {
     const limitCheck = await checkGuestLimits(req, sessionId);
     if (!limitCheck.allowed) {
       return res.status(403).json({ error: "LIMIT_REACHED", reason: limitCheck.reason });
+    }
+
+    // --- OPENAI PROVIDER DETECTION ---
+    let agentName = agentType || 'AISA';
+    const targetAgent = await Agent.findOne({
+      $or: [
+        { agentName: agentName },
+        { agentName: agentName.toUpperCase() },
+        { slug: agentName.toLowerCase() }
+      ]
+    });
+
+    if (targetAgent && targetAgent.provider === 'openai') {
+      try {
+        console.log(`[CHAT] Routing to OpenAI for agent: ${targetAgent.agentName}`);
+
+        let openaiReply = "";
+        const modelMapping = targetAgent.modelMapping || 'gpt-4.1';
+
+        // 1. IMAGE GENERATION (DALL-E)
+        if (detectedMode === 'IMAGE_GEN') {
+          openaiReply = await openaiService.generateImage(content, 'gpt-image-1');
+          await logUsage(req.user?.id || 'guest', targetAgent._id, 0, 'Image Generation'); // DALL-E usage is not token-based
+          return res.status(200).json({ reply: "I've generated the image you requested.", imageUrl: openaiReply });
+        }
+
+        // 2. VISION ANALYSIS
+        else if (targetAgent.slug === 'tool-openai-vision' && image) {
+          const firstImg = Array.isArray(image) ? image[0] : image;
+          const imageUrl = firstImg.url || `data:${firstImg.mimeType};base64,${firstImg.base64Data}`;
+          const result = await openaiService.visionAnalysis(imageUrl, content || "Analyze this image", modelMapping);
+
+          await logUsage(req.user?.id || 'guest', targetAgent._id, result.usage?.total_tokens, 'Vision Analysis');
+          return res.status(200).json({ reply: result.content });
+        }
+
+        // 3. VOICE NARRATION (TTS)
+        else if (targetAgent.slug === 'tool-openai-tts') {
+          const audioBuffer = await openaiService.textToSpeech(content, modelMapping);
+          const base64Audio = audioBuffer.toString('base64');
+          await logUsage(req.user?.id || 'guest', targetAgent._id, 0, 'Text-to-Speech'); // TTS usage is not token-based
+          return res.status(200).json({
+            reply: "Here is your audio narration.",
+            audioUrl: `data:audio/mpeg;base64,${base64Audio}`
+          });
+        }
+
+        // 4. AUDIO TRANSCRIBER (STT)
+        else if (targetAgent.slug === 'tool-openai-stt' && allAttachments.length > 0) {
+          const audioFile = allAttachments.find(a => a.mimeType?.startsWith('audio/') || a.name?.endsWith('.mp3') || a.name?.endsWith('.wav'));
+          if (audioFile) {
+            const buffer = Buffer.from(audioFile.base64Data, 'base64');
+            const text = await openaiService.speechToText(buffer, modelMapping);
+            await logUsage(req.user?.id || 'guest', targetAgent._id, 0, 'Speech-to-Text'); // STT usage is not token-based
+            return res.status(200).json({ reply: `### Transcription:\n\n${text}` });
+          }
+        }
+
+        // 5. DOCUMENT INTELLIGENCE
+        else if (targetAgent.slug === 'tool-openai-document' && document) {
+          // For now, we use the pre-extracted text logic if available in parts, 
+          // or we can pass a summary prompt. OpenAI doesn't natively "read" PDFs like Gemini yet in the chat completions API 
+          // without assistants API, so we rely on the text extracted by mammoth/PDF parsers in chatRoutes.
+          const result = await openaiService.generateContent(content, modelMapping);
+          await logUsage(req.user?.id || 'guest', targetAgent._id, result.usage?.total_tokens, 'Document Intelligence');
+          return res.status(200).json({ reply: result.content });
+        }
+
+        // 6. STANDARD CHAT / CONTENT WRITER / CODE ASSISTANT
+        else {
+          const result = await openaiService.generateContent(content, modelMapping);
+          openaiReply = result.content;
+
+          // Log Usage
+          await logUsage(req.user?.id || 'guest', targetAgent._id, result.usage?.total_tokens, 'Standard Chat');
+
+          return res.status(200).json({ reply: openaiReply });
+        }
+      } catch (openaiErr) {
+        console.error("[CHAT] OpenAI Routing failed:", openaiErr.message);
+        // Fallback to Gemini if OpenAI fails
+      }
     }
 
     // --- MULTI-MODEL DISPATCHER ---
@@ -135,7 +237,7 @@ router.post("/", optionalVerifyToken, identifyGuest, async (req, res) => {
     if (detectedMode === 'DOCUMENT_CONVERT') detectedMode = 'FILE_CONVERSION';
 
     const isExplicit = !!mode;
-    const agentName = agentType || 'AISA';
+    agentName = agentType || 'AISA';
     const agentCategory = req.body.agentCategory || 'General';
 
     // Force mode if using a specialized agent but detection failed

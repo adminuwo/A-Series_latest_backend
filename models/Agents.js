@@ -145,7 +145,16 @@ const AgentSchema = new mongoose.Schema(
             mimetype: String,
             size: Number,
             uploadDate: { type: Date, default: Date.now }
-        }]
+        }],
+        provider: {
+            type: String,
+            enum: ["vertex", "openai", "google", "anthropic"],
+            default: "vertex"
+        },
+        modelMapping: {
+            type: String,
+            default: ""
+        }
     },
     {
         timestamps: true

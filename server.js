@@ -45,6 +45,8 @@ import audioRoutes from './routes/audioRoutes.js';
 import searchRoutes from './routes/searchRoutes.js';
 import conversionRoutes from './routes/conversionRoutes.js';
 import reminderRoutes from './routes/reminderRoutes.js';
+import openaiRoutes from './routes/openai.routes.js';
+import { initializeOpenAI } from './config/openai.js';
 
 
 dotenv.config();
@@ -56,6 +58,7 @@ import { seedTools } from "./utils/seedTools.js";
 connectDB().then(async () => {
   console.log("Database connected, initializing services...");
   await aibaseService.initializeFromDB();
+  await initializeOpenAI();
   await seedTools();
 });
 
@@ -65,8 +68,12 @@ connectDB().then(async () => {
 // Debug CORS
 const allowedOrigins = [
   "http://localhost:5173",
+  "http://localhost:5174",
+  "http://localhost:5175",
   "http://localhost:8080",
   "http://127.0.0.1:5173",
+  "http://127.0.0.1:5174",
+  "http://127.0.0.1:5175",
   "http://192.168.29.47:5173",
   process.env.FRONTEND_URL
 ].filter(Boolean);
@@ -128,6 +135,7 @@ app.use('/api/audio', audioRoutes);
 app.use('/api/conversion', conversionRoutes);
 app.use('/api/reminders', reminderRoutes);
 app.use('/api/search', searchRoutes);
+app.use('/api/openai', openaiRoutes);
 
 
 // Auth Routes: /api/auth/login, /api/auth/signup

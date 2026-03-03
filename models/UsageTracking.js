@@ -25,6 +25,10 @@ const usageTrackingSchema = new mongoose.Schema({
     lastUsed: {
         type: Date,
         default: Date.now
+    },
+    provider: {
+        type: String,
+        default: 'vertex'
     }
 }, { timestamps: true });
 
