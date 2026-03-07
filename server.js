@@ -46,7 +46,10 @@ import searchRoutes from './routes/searchRoutes.js';
 import conversionRoutes from './routes/conversionRoutes.js';
 import reminderRoutes from './routes/reminderRoutes.js';
 import openaiRoutes from './routes/openai.routes.js';
+import aiwriteRoutes from './routes/aiwriteRoutes.js';
+import aihealthRoutes from './routes/aihealthRoutes.js';
 import { initializeOpenAI } from './config/openai.js';
+import { initCronJobs } from './cronHandler.js';
 
 
 dotenv.config();
@@ -164,6 +167,12 @@ app.use('/api/pdf', pdfRoutes);
 // AIBIZ Routes
 app.use('/api/aibiz', aibizRoutes);
 
+// AIWRITE Routes
+app.use('/api/aiwrite', aiwriteRoutes);
+
+// AIHEALTH Routes
+app.use('/api/aihealth', aihealthRoutes);
+
 // Report Routes
 app.use('/api/reports', reportRoutes);
 
@@ -196,6 +205,7 @@ app.use((err, req, res, next) => {
 
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`AI-Mall Backend running on  http://0.0.0.0:${PORT}`);
+  initCronJobs();
   console.log("Razorpay Config Check:", {
     KeyID: process.env.RAZORPAY_KEY_ID ? `${process.env.RAZORPAY_KEY_ID.substring(0, 8)}...` : "MISSING",
     Secret: process.env.RAZORPAY_KEY_SECRET ? "PRESENT" : "MISSING"

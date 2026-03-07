@@ -556,11 +556,103 @@ const toolsToSeed = [
     },
 
     // Utilities / Others
+    // --- WORKSPACE AGENTS ---
+    {
+        agentName: "AIBIZ",
+        slug: "tool-aibiz",
+        description: "Advanced Business Intelligence and CRM Workspace. Track analytics, manage leads, and segment customers seamlessly.",
+        category: "Business OS",
+        avatar: "", // Will fallback to Lucide Icon
+        status: "Live",
+        provider: "google",
+        pricingModel: "Free",
+        pricing: { type: "Free", plans: [] },
+        fullDesc: "Complete Business Intelligence and CRM management suite powered by advanced AI and data analytics. Segment your customers and track interaction histories to score leads effectively.",
+        features: ["CRM Analytics", "Lead Scoring", "Customer Segmentation", "Campaign Generation"],
+        bgGradient: "bg-gradient-to-br from-red-500 to-rose-600"
+    },
+    {
+        agentName: "AIHIRE",
+        slug: "tool-aihire",
+        description: "Intelligent Recruitment Engine. Evaluate candidates, parse resumes, and generate comprehensive hiring strategies.",
+        category: "HR & Finance",
+        avatar: "",
+        status: "Live",
+        provider: "google",
+        pricingModel: "Free",
+        pricing: { type: "Free", plans: [] },
+        fullDesc: "Simplify the hiring process. Use AI to automatically score resumes, prevent bias, extract professional skills, and prepare interview questions tailored to specific roles.",
+        features: ["Resume Parsing", "Candidate Scoring", "Bias Prevention", "Interview Prep"],
+        bgGradient: "bg-gradient-to-br from-emerald-500 to-teal-600"
+    },
+    {
+        agentName: "AIHEALTH",
+        slug: "tool-aihealth",
+        description: "Personal Wellness and Diagnostic Suite. Analyze symptoms, track metrics, and run health automation routines.",
+        category: "Medical & Health AI",
+        avatar: "",
+        status: "Live",
+        provider: "google",
+        pricingModel: "Free",
+        pricing: { type: "Free", plans: [] },
+        fullDesc: "Your digital mini-doctor. Input your symptoms, upload medical reports for simple-language summaries, generate wellness plans, and automate health monitoring.",
+        features: ["Symptom Checker", "Report Analyzer", "Mental Health Support", "Automated Routines"],
+        bgGradient: "bg-gradient-to-br from-pink-500 to-rose-500"
+    },
+    {
+        agentName: "AIWRITE",
+        slug: "tool-aiwrite",
+        description: "AI-Powered Content Generation and Curation Workspace. Create marketing copy and optimize text efficiently.",
+        category: "Sales & Marketing",
+        avatar: "",
+        status: "Live",
+        provider: "openai",
+        pricingModel: "Free",
+        pricing: { type: "Free", plans: [] },
+        fullDesc: "Scale your content creation dramatically. Provides an intelligent manuscript editor, blog generator, SEO optimizer, and multi-format conversion suite.",
+        features: ["Copywriting", "SEO Optimization", "Content Refining", "Manuscript Editing"],
+        bgGradient: "bg-gradient-to-br from-fuchsia-500 to-pink-600"
+    },
+    {
+        agentName: "AISALES",
+        slug: "tool-aisales",
+        description: "AI Sales Command Center. Analyze sales cycles and structure growth operations.",
+        category: "Sales & Marketing",
+        avatar: "",
+        status: "Live",
+        provider: "google",
+        pricingModel: "Free",
+        pricing: { type: "Free", plans: [] },
+        fullDesc: "Command center for your sales ops. Build personalized cold outreach strategies, follow-up timelines, and sales funnels powered by intelligent LLMs.",
+        features: ["Outreach Strategy", "Sales Funnels", "Pricing Analysis", "Competitor Research"],
+        bgGradient: "bg-gradient-to-br from-blue-500 to-indigo-600"
+    },
+    {
+        agentName: "AIDESK",
+        slug: "tool-aidesk",
+        description: "Support Desk & Ticket Resolution AI. Resolve customer queries efficiently.",
+        category: "Business OS",
+        avatar: "",
+        status: "Live",
+        provider: "google",
+        pricingModel: "Free",
+        pricing: { type: "Free", plans: [] },
+        fullDesc: "A complete AI Service Desk context. Solve user tickets efficiently, retrieve product knowledge instantly, and maintain quality customer service standards.",
+        features: ["Ticket Resolution", "Customer Support", "Knowledge Retrieval", "Automated QA"],
+        bgGradient: "bg-gradient-to-br from-amber-500 to-orange-500"
+    }
 ];
 
 export const seedTools = async () => {
     try {
         const forcedOrderSlugs = [
+            // Workspace Agents First
+            'tool-aibiz',
+            'tool-aihire',
+            'tool-aihealth',
+            'tool-aiwrite',
+            'tool-aisales',
+            'tool-aidesk',
             // OpenAI First
             'tool-openai-search-preview',
             'tool-openai-search-pro',

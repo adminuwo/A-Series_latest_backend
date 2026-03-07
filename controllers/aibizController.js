@@ -2,8 +2,7 @@ import Conversation from "../models/Conversation.js";
 import { genAIInstance as genAI, modelName } from "../config/vertex.js";
 import mongoose from "mongoose";
 
-// Using gemini-1.5-flash as it is the standard model configured in this project
-// equivalent to gemini-1.5-flash from the original AIBIZ code 
+// Use the central modelName (gemini-2.0-flash-001) as per user requirement
 const bizModel = genAI.getGenerativeModel({
     model: modelName,
 });
@@ -129,6 +128,190 @@ ${sections}
             success: false,
             error: "Failed to generate document",
         });
+    }
+};
+
+/* ------------------ CRM Analysis ------------------ */
+export const analyzeCRM = async (req, res) => {
+    try {
+        const { customer, interactions, promptOverride } = req.body;
+
+        const prompt = promptOverride || `
+        Analyze CRM data for ${customer.name}.
+        Industry: ${customer.industry}
+        Interaction History:
+        ${interactions.map(i => `- ${i.date}: ${i.subject} (${i.sentiment})`).join('\n')}
+
+        Provide:
+        1. Churn Risk Assessment
+        2. Upsell Opportunities
+        3. Suggested Response Draft
+        4. Health Trend Data for chart (JSON)
+        `;
+
+        const result = await bizModel.generateContent({
+            contents: [{ role: "user", parts: [{ text: prompt }] }],
+        });
+
+        const text = result?.response?.candidates?.[0]?.content?.parts?.[0]?.text;
+
+        res.json({
+            success: true,
+            data: {
+                analysis: text
+            }
+        });
+    } catch (err) {
+        console.error("❌ CRM Analysis error:", err);
+        res.status(500).json({ success: false, error: "Failed to analyze CRM data" });
+    }
+};
+
+/* ------------------ Lead Scoring ------------------ */
+export const scoreLead = async (req, res) => {
+    try {
+        const { leadData } = req.body;
+
+        const prompt = `
+        Act as an AI Lead Scoring Agent. 
+        Analyze the following lead data:
+        Lead Name: ${leadData.name}
+        Frequency: ${leadData.frequency}
+        Email Opens: ${leadData.opens}%
+        Website Visits: ${leadData.visits}
+        Industry: ${leadData.industry}
+        Budget: ${leadData.budget}
+        Engagement: ${leadData.engagement || 'Medium'}
+
+        Calculate a score (0-100) and priority (Hot, Warm, Cold).
+        Provide a concise reason for the score.
+
+        MANDATORY JSON OUTPUT:
+        {
+          "score": number,
+          "priority": "Hot" | "Warm" | "Cold",
+          "reason": "string"
+        }
+        `;
+
+        const result = await bizModel.generateContent({
+            contents: [{ role: "user", parts: [{ text: prompt }] }],
+        });
+
+        const text = result?.response?.candidates?.[0]?.content?.parts?.[0]?.text;
+
+        // Extract JSON if AI wrapped it in markdown
+        const jsonMatch = text.match(/\{[\s\S]*\}/);
+        const scoring = jsonMatch ? JSON.parse(jsonMatch[0]) : { score: 0, priority: 'Cold', reason: 'Failed to parse' };
+
+        res.json({
+            success: true,
+            data: scoring
+        });
+    } catch (err) {
+        console.error("❌ Lead Scoring error:", err);
+        res.status(500).json({ success: false, error: "Failed to score lead" });
+    }
+};
+
+/* ------------------ Customer Segmentation ------------------ */
+export const segmentCustomers = async (req, res) => {
+    try {
+        const { userData } = req.body;
+
+        const prompt = `
+        Act as a SaaS Growth Strategist.
+        Analyze this batch of user data for behavioral segmentation:
+        ${JSON.stringify(userData)}
+
+        Tasks:
+        1. Apply RFM (Recency, Frequency, Monetary) clustering.
+        2. Generate 4 distinct AI personas based on behavior.
+        3. Identify "At-Risk" and "High-Value" clusters.
+        4. Provide strategic recommendations for each segment.
+
+        MANDATORY JSON OUTPUT:
+        {
+          "segments": [
+            {
+              "name": "string",
+              "rfm": "string (e.g. 5-5-5)",
+              "count": number,
+              "persona": "string",
+              "behavior": "string",
+              "details": "string",
+              "color": "hex"
+            }
+          ],
+          "ai_insight": "string"
+        }
+        `;
+
+        const result = await bizModel.generateContent({
+            contents: [{ role: "user", parts: [{ text: prompt }] }],
+        });
+
+        const text = result?.response?.candidates?.[0]?.content?.parts?.[0]?.text;
+        const jsonMatch = text.match(/\{[\s\S]*\}/);
+        const segmentation = jsonMatch ? JSON.parse(jsonMatch[0]) : { segments: [], ai_insight: 'Analysis failed' };
+
+        res.json({
+            success: true,
+            data: segmentation
+        });
+    } catch (err) {
+        console.error("❌ Segmentation error:", err);
+        res.status(500).json({ success: false, error: "Failed to segment customers" });
+    }
+};
+
+/* ------------------ Campaign Generation ------------------ */
+export const generateCampaign = async (req, res) => {
+    try {
+        const { segment, goal, channel } = req.body;
+
+        const prompt = `
+        Act as a Direct Response Marketer & AI Copywriter.
+        Target Segment: ${segment.name}
+        Core Behavior: ${segment.behavior}
+        Campaign Goal: ${goal}
+        Channel: ${channel}
+
+        Tasks:
+        1. Generate a high-converting Subject Line (for Email) or Hook (for WhatsApp).
+        2. Create 2 A/B Variants (Variant A: Direct Benefit, Variant B: Scarcity/FOMO).
+        3. Provide 3 CTA suggestions.
+        4. Recommend the 'Best Send Time' based on typical ${segment.persona} behavior.
+        5. Predict CTR for each variant.
+
+        MANDATORY JSON OUTPUT:
+        {
+          "subject": "string",
+          "variants": [
+            { "id": "A", "body": "string", "ctr": "string" },
+            { "id": "B", "body": "string", "ctr": "string" }
+          ],
+          "ctas": ["string", "string", "string"],
+          "best_send_time": "string",
+          "ai_logic": "string"
+        }
+        `;
+
+        const result = await bizModel.generateContent({
+            contents: [{ role: "user", parts: [{ text: prompt }] }],
+        });
+
+        const text = result?.response?.candidates?.[0]?.content?.parts?.[0]?.text;
+        const jsonMatch = text.match(/\{[\s\S]*\}/);
+        const campaign = jsonMatch ? JSON.parse(jsonMatch[0]) : { subject: 'Failed to generate', variants: [] };
+
+        res.json({
+            success: true,
+            data: campaign
+        });
+    } catch (err) {
+        console.error("❌ Campaign Generation error:", err);
+        res.status(500).json({ success: false, error: "Failed to generate campaign" });
     }
 };
 
