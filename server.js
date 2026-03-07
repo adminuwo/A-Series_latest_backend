@@ -51,7 +51,8 @@ import { initializeOpenAI } from './config/openai.js';
 
 dotenv.config();
 const app = express();
-const PORT = process.env.PORT
+// Sanitize PORT to remove hidden \r or \n characters
+const PORT = process.env.PORT ? process.env.PORT.toString().trim() : 8080;
 import { seedTools } from "./utils/seedTools.js";
 
 // Connect to Database
@@ -98,8 +99,15 @@ app.use(cors({
 }));
 app.use(cookieParser())
 app.use(express.json({ limit: "50mb" }));
+// Catch JSON parsing errors to prevent server crash
+app.use((err, req, res, next) => {
+  if (err instanceof SyntaxError && err.status === 400 && 'body' in err) {
+    console.error('[API ERROR] Malformed JSON Body detected:', err.message);
+    return res.status(400).json({ error: "Invalid JSON format in request body" });
+  }
+  next();
+});
 app.use(express.urlencoded({ extended: true, limit: "50mb" }));
-// app.use(fileUpload()); // Removed to avoid conflict with Multer (New AIBASE)
 
 app.get("/ping-top", (req, res) => {
   res.send("Top ping works");

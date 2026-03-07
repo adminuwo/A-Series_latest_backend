@@ -116,7 +116,7 @@ export const visionAnalyzer = async (req, res, next) => {
 
 export const realTimeWebSearch = async (req, res, next) => {
     try {
-        const { query, language, isDeepSearch } = req.body;
+        const { query, language, isDeepSearch, modelMapping } = req.body;
 
         if (!query) {
             return res.status(400).json({ success: false, message: 'Search query is required' });
@@ -135,11 +135,12 @@ export const realTimeWebSearch = async (req, res, next) => {
         const systemInstruction = getWebSearchSystemInstruction(results, language || 'English', isDeepSearch);
         const userPrompt = `Based on these search results, answer: ${query}`;
 
-        const result = await openaiService.generateContent(userPrompt, 'gpt-4.1', {
+        const modelTier = modelMapping || 'gpt-search-pro';
+        const result = await openaiService.generateContent(userPrompt, modelTier, {
             system: systemInstruction
         });
 
-        await logUsage(req.user?.id || 'admin', 'tool-openai-search', result.usage?.total_tokens, 'Real Time Web Search');
+        await logUsage(req.user?.id || 'admin', modelMapping || 'tool-openai-search', result.usage?.total_tokens, 'Real Time Web Search');
 
         res.status(200).json({
             success: true,
@@ -176,6 +177,47 @@ export const structuredDataExtractor = async (req, res, next) => {
 
         await logUsage(req.user?.id || 'admin', 'tool-openai-extractor', result.usage?.total_tokens, 'Structured Data Extractor');
         res.status(200).json({ success: true, data: result.content });
+    } catch (error) {
+        next(error);
+    }
+};
+
+export const semanticEmbeddings = async (req, res, next) => {
+    try {
+        const { text } = req.body;
+        if (!text) return res.status(400).json({ success: false, message: 'Text content required' });
+
+        const embedding = await openaiService.generateEmbeddings(text);
+
+        await logUsage(req.user?.id || 'admin', 'tool-openai-embeddings', 0, 'Semantic Text Embedder');
+        res.status(200).json({ success: true, data: embedding });
+    } catch (error) {
+        next(error);
+    }
+};
+
+export const videoGenerator = async (req, res, next) => {
+    try {
+        const { prompt } = req.body;
+        if (!prompt) return res.status(400).json({ success: false, message: 'Prompt is required' });
+
+        const videoUrl = await openaiService.generateVideo(prompt, 'gpt-video-1');
+        await logUsage(req.user?.id || 'admin', 'tool-openai-video', 0, 'AI Video Creator Pro');
+        res.status(200).json({ success: true, data: videoUrl });
+    } catch (error) {
+        next(error);
+    }
+};
+
+export const imageEditor = async (req, res, next) => {
+    try {
+        const { prompt, modelMapping } = req.body;
+        if (!req.file) return res.status(400).json({ success: false, message: 'Image file is required' });
+        if (!prompt) return res.status(400).json({ success: false, message: 'Editing prompt is required' });
+
+        const resultUrl = await openaiService.generateImageEdit(prompt, req.file.buffer, modelMapping || 'gpt-image-1.5');
+        await logUsage(req.user?.id || 'admin', 'tool-openai-image-edit', 0, 'AI Image Editing Pro');
+        res.status(200).json({ success: true, data: resultUrl });
     } catch (error) {
         next(error);
     }

@@ -8,8 +8,19 @@ class OpenAIService {
             'gpt-4.1': 'gpt-4o',
             'gpt-4.1-mini': 'gpt-4o-mini',
             'gpt-image-1': 'dall-e-3',
+            'gpt-image-pro': 'dall-e-3',
+            'gpt-image-standard': 'dall-e-3',
+            'gpt-image-1.5': 'dall-e-3',
+            'gpt-image-1-mini': 'dall-e-2',
             'gpt-4o-mini-tts': 'tts-1',
-            'gpt-4o-transcribe': 'whisper-1'
+            'gpt-4o-transcribe': 'whisper-1',
+            'gpt-video-1': 'sora-2',
+            'gpt-video-1.5': 'sora-2-pro',
+            'gpt-video-2': 'sora-2-pro',
+            'gpt-search-preview': 'gpt-4o-search-preview',
+            'gpt-search-pro': 'gpt-4o',
+            'gpt-search-mini': 'gpt-4o-mini',
+            'gpt-search-realtime': 'gpt-4o-realtime-preview'
         };
     }
 
@@ -48,6 +59,25 @@ class OpenAIService {
 
         const response = await openai.images.generate({
             model: model,
+            prompt: prompt,
+            n: 1,
+            size: "1024x1024",
+        });
+
+        return response.data[0].url;
+    }
+
+    async generateImageEdit(prompt, imageBuffer, modelKey = 'gpt-image-1.5') {
+        const openai = getOpenAIInstance();
+        if (!openai) throw new Error("OpenAI not initialized");
+
+        const model = this.MODEL_MAPPING[modelKey] || 'dall-e-2';
+        logger.info(`[OPENAI] Requesting image edit with model: ${model}`);
+
+        // Image editing requires a valid square PNG file < 4MB
+        const response = await openai.images.edit({
+            model: model,
+            image: await OpenAI.toFile(imageBuffer, "image.png"),
             prompt: prompt,
             n: 1,
             size: "1024x1024",
@@ -118,6 +148,32 @@ class OpenAIService {
             content: response.choices[0].message.content,
             usage: response.usage
         };
+    }
+
+    async generateVideo(prompt, modelKey = 'gpt-video-1') {
+        const openai = getOpenAIInstance();
+        if (!openai) throw new Error("OpenAI not initialized");
+
+        const model = this.MODEL_MAPPING[modelKey] || 'sora-2-pro';
+        logger.info(`[OPENAI] Requesting video generation with model: ${model}`);
+
+        // Video generation (Sora) typically involves an async process. 
+        // For now, we provide the architectural hook.
+        throw new Error("OpenAI Sora-2-Pro video generation is currently in limited release. API integration will be activated once your OpenAI account has been granted access.");
+    }
+
+    async generateEmbeddings(text) {
+        const openai = getOpenAIInstance();
+        if (!openai) throw new Error("OpenAI not initialized");
+
+        logger.info(`[OPENAI] Requesting embeddings for text: ${text.substring(0, 50)}...`);
+        const response = await openai.embeddings.create({
+            model: "text-embedding-3-small",
+            input: text,
+            encoding_format: "float",
+        });
+
+        return response.data[0].embedding;
     }
 }
 

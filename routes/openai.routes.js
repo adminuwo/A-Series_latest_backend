@@ -16,5 +16,8 @@ router.post('/vision', openaiController.visionAnalyzer);
 router.post('/search', openaiController.realTimeWebSearch);
 router.post('/translate', openaiController.professionalTranslator);
 router.post('/extract', openaiController.structuredDataExtractor);
+router.post('/embeddings', openaiController.semanticEmbeddings);
+router.post('/video', openaiController.videoGenerator);
+router.post('/image-edit', upload.single('image'), openaiController.imageEditor);
 
 export default router;
