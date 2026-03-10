@@ -270,7 +270,7 @@ const toolsToSeed = [
     {
         agentName: "Audio Transcriber",
         slug: "tool-openai-stt",
-        description: "Accurately convert speech and audio recordings into structured text with intelligent context understanding.",
+        description: "Professional STT engine for converting audio and video to text with Speaker Identification.",
         category: "AI TOOL",
         avatar: "/AGENTS_IMG/transcriber.png",
         status: "Live",
@@ -279,8 +279,8 @@ const toolsToSeed = [
         apiRoute: "/api/openai/stt",
         pricingModel: "Free",
         pricing: { type: "Free", plans: [] },
-        fullDesc: "Accurately convert speech and audio recordings into structured text with intelligent context understanding. Supports multiple accents and noisy environments for reliable transcription workflows.\n\nPowered by advanced OpenAI intelligence for premium creative and cognitive AI capabilities.",
-        features: ["Context Understanding", "Accent Support", "Noise Reduction", "Structured Transcripts"],
+        fullDesc: "Accurately convert spoken words from audio or video files (MP3, WAV, M4A, FLAC, MP4) into written text. Supports meetings, podcasts, interviews, and lectures with high precision.\n\n**Advanced Intelligence:**\n- **Speech-to-Text & Diarization**: High-accuracy ASR with multi-speaker detection (Speaker 1, Speaker 2).\n- **Real-time Transcription**: Instant live captioning and meeting note generation.\n- **Timestamping & Punctuation**: Automatic time markers and professional formatting for readability.\n- **Subtitle Generation**: Effortlessly convert transcripts into video-ready subtitles (SRT, VTT, ASS) for YouTube, courses, and films.\n- **Noise Filtering & Clarity**: Advanced background noise suppression (traffic, wind, crowd) for crystal-clear results.\n- **Keyword & Sentiment Detection**: Automatically identifies important terms and analyzes the emotional tone of speakers.\n- **Voice Command Ready**: Detects trigger commands like 'Start recording' for hands-free operation.\n- **Search & Edit**: Fully searchable transcripts with an intuitive editor to correct text or adjust metadata.\n- **Multilingual Support**: Auto-detects and translates English, Hindi, Spanish, and more.\n\nPowered by advanced OpenAI intelligence for professional-grade transcription ecosystems.",
+        features: ["Subtitle Generation (SRT/VTT)", "Sentiment Analysis", "Voice Command Detection", "Noise Filtering"],
         bgGradient: "bg-gradient-to-br from-teal-400 to-green-500"
     },
     {
@@ -502,15 +502,15 @@ const toolsToSeed = [
     {
         agentName: "Audio Transcriber (Chirp 3)",
         slug: "tool-vertex-stt",
-        description: "Elite multilingual speech-to-text recognition with enhanced accuracy.",
+        description: "Elite multilingual speech-to-text with advanced Speaker Diarization.",
         category: "Productivity",
         avatar: "/AGENTS_IMG/AITRANS.png",
         status: "Live",
         provider: "google",
         pricingModel: "Free",
         pricing: { type: "Free", plans: [] },
-        fullDesc: "Experience the next generation of speech-to-text technology. Chirp 3 is Google's latest multilingual ASR model, designed for high accuracy and speed across dozens of languages. Includes support for diarization and noisy environments.\n\nPowered by Google Vertex AI (Chirp 3).",
-        features: ["Multilingual Accuracy", "Real-time Transcription", "Speaker Diarization", "Noise Resilience"],
+        fullDesc: "Step into the next generation of speech-to-text technology. Chirp 3 is Google's latest multilingual ASR model, optimized for high accuracy across dozens of languages. Perfect for complex meetings and multi-speaker interviews.\n\n**Elite Capabilities:**\n- **Multilingual Support**: High accuracy across global languages including English and Hindi with auto-detection.\n- **Speaker Identification**: Labels speakers automatically in panel discussions and interviews.\n- **Sentiment & Emotion Analysis**: Analyzes the sentiment of every speaker to provide emotional context.\n- **Subtitle & Caption Generation**: Export transcripts directly to SRT, VTT, or ASS formats for YouTube and films.\n- **Voice Command Recognition**: Specialized detection for commands like 'Start recording' or 'Next slide'.\n- **Advanced Noise Resilience**: Handles traffic, crowd sounds, and echo for clear transcriptions in noisy environments.\n- **Live Transcription & Timestamps**: Instant captioning with precise time markers.\n- **Keyword Analysis**: Automatically highlights key terms like pricing, investment, or project names.\n- **Searchable & Editable**: Navigate long transcripts instantly and make manual corrections effortlessly.\n\nPowered by Google Vertex AI (Chirp 3).",
+        features: ["Subtitle Export (SRT/VTT)", "Sentiment Analysis", "Voice Commands", "Noise Suppression"],
         bgGradient: "bg-gradient-to-br from-teal-400 to-emerald-600"
     },
     {
@@ -543,14 +543,14 @@ const toolsToSeed = [
     {
         agentName: "AI Code Writer (Gemini 1.5 Pro)",
         slug: "tool-code-writer",
-        description: "Expert coding, debugging, and architecture suggestions powered by Gemini.",
+        description: "AI Code Writer is an intelligent development assistant that helps developers generate, debug, and optimize code across multiple programming languages.",
         category: "Developer Tools",
         avatar: "/AGENTS_IMG/code-writer.png",
         status: "Live",
         provider: "google",
         pricingModel: "Free",
         pricing: { type: "Free", plans: [] },
-        fullDesc: "Your elite AI pair programmer. Leverage the power of Gemini 1.5 Pro to generate clean, scalable code, debug complex errors, and refactor architecture with massive context understanding.\n\nPowered by Google Vertex AI (Gemini 1.5 Pro).",
+        fullDesc: "AI Code Writer is an intelligent development assistant that helps developers generate, debug, and optimize code across multiple programming languages.\n\nPowered by Google Vertex AI (Gemini 1.5 Pro).",
         features: ["Pro-Level Coding", "Smart Debugging", "Architecture Design", "Multi-language Support"],
         bgGradient: "bg-gradient-to-br from-emerald-500 to-green-600"
     },
@@ -717,11 +717,17 @@ export const seedTools = async () => {
         console.log("[SEED] Reset marketplace sequence: OpenAI First, Vertex AI Second.");
 
         for (const tool of toolsToSeed) {
+            // Force delete before upsert to ensure all fields are fresh and no duplicates exist
+            await agentModel.deleteOne({ slug: tool.slug });
+
             await agentModel.findOneAndUpdate(
                 { slug: tool.slug },
                 { $set: tool },
                 { upsert: true, new: true }
             );
+            if (tool.slug === 'tool-code-writer') {
+                console.log(`[SEED] Re-seeded tool-code-writer. Description: ${tool.description.substring(0, 30)}...`);
+            }
             console.log(`[SEED] Ensured tool: ${tool.agentName}`);
         }
         console.log("[SEED] Tools re-sequencing complete.");

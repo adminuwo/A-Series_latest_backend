@@ -24,7 +24,7 @@ class OpenAIService {
         };
     }
 
-    async generateContent(prompt, modelKey = 'gpt-4.1', options = {}) {
+    async generateContent(prompt, modelKey = 'gpt-4.1', history = [], options = {}) {
         const openai = getOpenAIInstance();
         if (!openai) throw new Error("OpenAI not initialized");
 
@@ -36,6 +36,17 @@ class OpenAIService {
             messages.push({ role: "system", content: options.system });
             delete options.system;
         }
+
+        // Add history
+        if (history && history.length > 0) {
+            history.forEach(msg => {
+                messages.push({
+                    role: msg.role === 'model' ? 'assistant' : 'user',
+                    content: msg.content
+                });
+            });
+        }
+
         messages.push({ role: "user", content: prompt });
 
         const response = await openai.chat.completions.create({

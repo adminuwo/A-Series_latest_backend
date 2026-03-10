@@ -89,19 +89,14 @@ route.post('/', verifyToken, async (req, res) => {
   }
 });
 
-//own agents
-route.post('/buy/:id', async (req, res) => {
+// own agents
+route.post('/buy/:id', verifyToken, async (req, res) => {
   try {
     const agentId = req.params.id;
-    const { userId } = req.body;
+    const userId = req.user.id; // Correctly get userId from token
 
     console.log("[BUY AGENT] Agent ID:", agentId);
-    console.log("[BUY AGENT] User ID from body:", userId);
-    console.log("[BUY AGENT] User ID type:", typeof userId);
-
-    if (!userId) {
-      return res.status(400).json({ error: "userId is required" });
-    }
+    console.log("[BUY AGENT] User ID from token:", userId);
 
     const user = await userModel.findById(userId);
 
@@ -171,16 +166,11 @@ route.post('/buy/:id', async (req, res) => {
   }
 });
 
-//get My agents
-route.post("/get_my_agents", async (req, res) => {
+// get My agents
+route.post("/get_my_agents", verifyToken, async (req, res) => {
   try {
-    const { userId } = req.body
-    console.log('[GET MY AGENTS] Fetching for userId:', userId);
-
-    if (!userId) {
-      console.error('[GET MY AGENTS] No userId provided in body');
-      return res.status(400).send("User ID is required")
-    }
+    const userId = req.user.id; // Correctly get userId from token
+    console.log('[GET MY AGENTS] Fetching for userId (token):', userId);
 
     const user = await userModel.findById(userId).populate("agents")
     if (!user) {
