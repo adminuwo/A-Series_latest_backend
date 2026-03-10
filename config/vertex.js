@@ -10,13 +10,8 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 // FORCE VERTEX AI ONLY
 const projectId = process.env.GCP_PROJECT_ID;
-<<<<<<< HEAD
 const location = 'asia-south1'; // REGION_MARKER_V2
 const keyFilePath = path.join(__dirname, '../google_cloud_credentials.json');
-=======
-const location = 'us-central1'; // Better feature support (Grounding/Function Calling)
-const keyFilePath = path.join(__dirname, '../../google_cloud_credentials.json');
->>>>>>> ae32634a141c28c68e55eb8bf1a7edbf0cdfbebf
 
 let vertexAI;
 
@@ -29,15 +24,9 @@ if (fs.existsSync(keyFilePath)) {
   console.log(`🔑 [Vertex] Found key file, setting GOOGLE_APPLICATION_CREDENTIALS`);
 }
 
-<<<<<<< HEAD
 console.log(`✅ Vertex AI initializing with project: ${projectId}`);
 console.log(`📍 Location: ${location}`);
 
-// Model name - Stable version
-export const modelName = "gemini-2.5-flash";
-
-=======
->>>>>>> ae32634a141c28c68e55eb8bf1a7edbf0cdfbebf
 try {
   // Initialize Vertex AI
   const vertexOptions = { project: projectId, location: location };
@@ -55,13 +44,8 @@ try {
   vertexAI = { preview: { getGenerativeModel: () => ({ generateContent: () => { throw new Error("Vertex AI not initialized"); } }) } };
 }
 
-<<<<<<< HEAD
-const systemInstructionText = `You are AIVA™, the internal intelligent assistant developed and trained under
-Unified Web Options & Services (UWO) for the AI Mall™ ecosystem.
-=======
-const systemInstructionText = `You are AISA™, an advanced intelligent assistant developed by Unified Web Options & Services (UWO) for the AI Mall™ ecosystem.
+const systemInstructionText = `You are AIVA™, an advanced intelligent assistant developed by Unified Web Options & Services (UWO) for the AI Mall™ ecosystem.
 You are powered by Google's Vertex AI API and specialized models.
->>>>>>> ae32634a141c28c68e55eb8bf1a7edbf0cdfbebf
 Development and implementation are led by Sanskar Sahu.
 
 - MANDATORY: If asked about your origin or who you are, state that you are AISA™ from AI Mall™, powered by Unified Web Options/Services and Vertex AI.

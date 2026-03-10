@@ -65,14 +65,11 @@ const extractText = (response) => {
 // Get all chat sessions (summary)
 router.post("/", optionalVerifyToken, identifyGuest, async (req, res) => {
   const { content, history, systemInstruction, image, video, document, language, model, mode, sessionId, agentType } = req.body;
-<<<<<<< HEAD
-=======
   const isDeepSearch = req.body.isDeepSearch || (systemInstruction && systemInstruction.includes('DEEP SEARCH MODE ENABLED'));
 
   let detectedMode = mode; // Pre-define for catch block accessibility
   let finalResponse = {}; // Initialize early for tool calls
   let reply = ""; // Declare reply at route level
->>>>>>> ae32634a141c28c68e55eb8bf1a7edbf0cdfbebf
 
   try {
     // Enforce limits for guests
@@ -275,9 +272,6 @@ router.post("/", optionalVerifyToken, identifyGuest, async (req, res) => {
     // Use mode-specific system instruction, or fallback to provided systemInstruction
     // CRITICAL: FILE_CONVERSION instructions must take priority over frontend generic prompts
     let finalSystemInstruction = systemInstruction || modeSystemInstruction;
-<<<<<<< HEAD
-    if ((detectedMode === 'FILE_CONVERSION' || detectedMode === 'FILE_ANALYSIS') && !agentType) {
-=======
 
     // TOOL USAGE RULES - Apply to all modes to ensure intelligence and real-time awareness
     const now = new Date();
@@ -297,7 +291,6 @@ MANDATORY: You have access to specialized tools for generating images, videos, a
 CRITICAL RULE: NEVER output raw JSON text or markdown code blocks containing "action" or "prompt" fields. You MUST use the native function calling feature to execute tools. If you output JSON as text, you have FAILED your objective. Just call the tool and then provide a natural language response. Attempt to follow the user's exact instructions for modification.`;
 
     if (detectedMode === 'FILE_CONVERSION' || detectedMode === 'FILE_ANALYSIS') {
->>>>>>> ae32634a141c28c68e55eb8bf1a7edbf0cdfbebf
       finalSystemInstruction = modeSystemInstruction;
     } else if (agentType && agentType !== 'AISA') {
       // For specialized agents, append the mode instruction and tool rules to the base identity

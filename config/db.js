@@ -1,10 +1,6 @@
 import mongoose from 'mongoose';
 import dns from 'dns';
-<<<<<<< HEAD
-=======
 dns.setDefaultResultOrder('ipv4first');
-
->>>>>>> ae32634a141c28c68e55eb8bf1a7edbf0cdfbebf
 import { MONGO_URI } from './env.js';
 import logger from '../utils/logger.js';
 

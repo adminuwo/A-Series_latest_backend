@@ -1,9 +1,5 @@
 import Conversation from "../models/Conversation.js";
-<<<<<<< HEAD
 import { generativeModel, genAIInstance as genAI, modelName } from "../config/vertex.js";
-=======
-import { genAIInstance as genAI, modelName } from "../config/vertex.js";
->>>>>>> ae32634a141c28c68e55eb8bf1a7edbf0cdfbebf
 import mongoose from "mongoose";
 
 // Standard Enterprise Model Config
