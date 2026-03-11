@@ -10,9 +10,13 @@ route.get("/", verifyToken, async (req, res) => {
 
         const userId = req.user.id
         const user = await userModel.findById(userId)
+        if (!user) {
+            return res.status(401).json({ error: "User Not Found or Session Expired" });
+        }
         res.status(200).json(user)
     } catch (error) {
-        res.send({ msg: "somthing went wrong" })
+        console.error("Fetch user error:", error);
+        res.status(500).json({ error: "Something went wrong" });
     }
 
 })

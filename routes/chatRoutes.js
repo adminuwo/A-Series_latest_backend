@@ -78,6 +78,15 @@ router.post("/", optionalVerifyToken, identifyGuest, async (req, res) => {
       return res.status(403).json({ error: "LIMIT_REACHED", reason: limitCheck.reason });
     }
 
+    // Detect mode based on content and attachments
+    const allAttachments = [];
+    if (Array.isArray(image)) allAttachments.push(...image);
+    else if (image) allAttachments.push(image);
+    if (Array.isArray(document)) allAttachments.push(...document);
+    else if (document) allAttachments.push(document);
+    if (Array.isArray(video)) allAttachments.push(...video);
+    else if (video) allAttachments.push(video);
+
     // --- OPENAI PROVIDER DETECTION ---
     let agentName = agentType || 'AISA';
     const targetAgent = await Agent.findOne({
@@ -226,14 +235,6 @@ router.post("/", optionalVerifyToken, identifyGuest, async (req, res) => {
         console.log(`Falling back to Gemini due to ${model} failure.`);
       }
     }
-    // Detect mode based on content and attachments
-    const allAttachments = [];
-    if (Array.isArray(image)) allAttachments.push(...image);
-    else if (image) allAttachments.push(image);
-    if (Array.isArray(document)) allAttachments.push(...document);
-    else if (document) allAttachments.push(document);
-    if (Array.isArray(video)) allAttachments.push(...video);
-    else if (video) allAttachments.push(video);
 
     detectedMode = mode || detectMode(content, allAttachments);
     if (detectedMode === 'DOCUMENT_CONVERT') detectedMode = 'FILE_CONVERSION';
@@ -256,7 +257,18 @@ router.post("/", optionalVerifyToken, identifyGuest, async (req, res) => {
         }
       } else if (lowerAgentName.includes('music') || lowerAgentName.includes('lyria') || lowerAgentName.includes('audio')) {
         detectedMode = 'AUDIO_GEN';
+      } else if (lowerAgentName.includes('pathology') || lowerAgentName.includes('medgemma')) {
+        detectedMode = 'MEDICAL_ANALYSIS';
       }
+    }
+
+    // --- MODEL OVERRIDE FOR SPECIALIZED AGENTS ---
+    let activeModelName = model || primaryModelName;
+    if (targetAgent?.slug === 'tool-pathology-medgemma') {
+      // In Vertex AI Model Garden, MedGemma variants often use specific model IDs.
+      // We'll set a standard medical-expert system prompt for now or point to the medl-m variants if available.
+      // Default to the highly capable Gemini 2.0 Pro but with a specialized MedGemma persona.
+      activeModelName = primaryModelName;
     }
 
     const modeSystemInstruction = getModeSystemInstruction(detectedMode, language || 'English', {
