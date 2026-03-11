@@ -104,7 +104,7 @@ route.post('/buy/:id', verifyToken, async (req, res) => {
 
     if (!user) {
       console.error("[BUY AGENT] User not found in database. UserId:", userId);
-      return res.status(404).json({ error: "User Not Found" });
+      return res.status(401).json({ error: "User Not Found or Session Expired" });
     }
 
     // Avoid duplicate agent entries
@@ -175,7 +175,7 @@ route.post("/get_my_agents", verifyToken, async (req, res) => {
     const user = await userModel.findById(userId).populate("agents")
     if (!user) {
       console.error('[GET MY AGENTS] User Not Found in DB:', userId);
-      return res.status(404).send("User Not Found")
+      return res.status(401).json({ error: "User Not Found or Session Expired" })
     }
 
     console.log(`[GET MY AGENTS] Success. User: ${user.email}, Agent count: ${user.agents?.length || 0}`);

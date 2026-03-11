@@ -170,7 +170,7 @@ const toolsToSeed = [
 
     // Video Creator Suite
     {
-        agentName: "AI Video Creator (Sora-2)",
+        agentName: "AI Video Creator",
         slug: "tool-openai-video-standard",
         description: "Transform your text prompts into high-quality AI videos with smooth motion synthesis.",
         category: "AI TOOL",
@@ -186,7 +186,7 @@ const toolsToSeed = [
         bgGradient: "bg-gradient-to-br from-blue-500 to-cyan-600"
     },
     {
-        agentName: "AI Video Creator Pro (Sora-2 Pro)",
+        agentName: "AI Video Creator Pro",
         slug: "tool-openai-video",
         description: "Experience the next level of cinematic AI video generation with enhanced realism and consistency.",
         category: "AI TOOL",
@@ -202,7 +202,7 @@ const toolsToSeed = [
         bgGradient: "bg-gradient-to-br from-purple-600 to-indigo-700"
     },
     {
-        agentName: "AI Video Creator Max (Sora-2 Pro High-Res)",
+        agentName: "AI Video Creator Max",
         slug: "tool-openai-video-max",
         description: "The ultimate AI video tool for ultra-high-resolution cinematic production and complex scene synthesis.",
         category: "AI TOOL",
@@ -406,9 +406,9 @@ const toolsToSeed = [
         bgGradient: "bg-gradient-to-br from-primary to-purple-600"
     },
     {
-        agentName: "AI Image Generator (Imagen 4 Ultra)",
+        agentName: "AI Image Generator",
         slug: "tool-image-gen",
-        description: "Generate elite, ultra-high-resolution visuals with complex compositional understanding.",
+        description: "Google's advanced text-to-image technology for generating novel images with ultra-high resolution and SynthID watermarking.",
         category: "Creative",
         avatar: "/AGENTS_IMG/image-gen.png",
         status: "Live",
@@ -417,18 +417,18 @@ const toolsToSeed = [
             type: "Free",
             plans: []
         },
-        fullDesc: "The elite tier of Google's image generation suite. Imagen 4 Ultra is designed for the most demanding creative projects, delivering unmatched photorealism, deep compositional understanding, and ultra-high-resolution outputs for pro-level art and branding.\n\nPowered by Google Vertex AI (Imagen 4 Ultra).",
+        fullDesc: "Imagen 4 Ultra brings Google's advanced text-to-image technology to your creative projects. Use text prompts to generate novel, high-quality images that match your specific brand requirements with enterprise-grade reliability.\n\nAdvanced Capabilities:\n• Multiple Aspect Ratios: Support generation with 1:1, 9:16, 16:9, 3:4, and 4:3 aspect ratios.\n• High-Resolution Output: Generate images in crisp 1k or 2k output resolutions.\n• Invisible Tracking: Integrated digital watermarking (SynthID).\n• Prompt Enhancement: Automatically rewrites inputs using LLM-based intelligence to generate better results.\n\nPowered by Google Vertex AI (imagen-4.0-ultra-generate-001).",
         features: [
-            "Elite Photorealism",
-            "Ultra-High Resolution",
-            "Complex Compositional Reasoning",
-            "Professional Branding Fidelity"
+            "1k & 2k Resolutions",
+            "Multiple Aspect Ratios",
+            "LLM Prompt Enhancement",
+            "SynthID Watermarking"
         ],
         provider: "google",
         bgGradient: "bg-gradient-to-br from-fuchsia-500 to-pink-600"
     },
     {
-        agentName: "Deep Search (Gemini 2.0 Pro)",
+        agentName: "Deep Search",
         slug: "tool-deep-search",
         description: "Advanced research & data analysis powered by Gemini 2.0 Pro.",
         category: "Research",
@@ -450,7 +450,7 @@ const toolsToSeed = [
         bgGradient: "bg-gradient-to-br from-blue-500 to-cyan-600"
     },
     {
-        agentName: "AI Video Generator (Veo 3)",
+        agentName: "AI Video Generator",
         slug: "tool-video-gen",
         description: "Create high-definition cinematic videos with ultra-realistic motion.",
         category: "Creative",
@@ -472,17 +472,17 @@ const toolsToSeed = [
         bgGradient: "bg-gradient-to-br from-indigo-500 to-purple-600"
     },
     {
-        agentName: "Lyria 2 for Music Generation",
+        agentName: "Music Generation",
         slug: "tool-vertex-music-gen",
         description: "Latent text-to-audio diffusion model for high-quality instrumental music.",
         category: "Creative",
-        avatar: "/AGENTS_IMG/AIMUSIC.png",
+        avatar: "/AGENTS_IMG/music-generation.png",
         status: "Live",
         provider: "google",
         pricingModel: "Free",
         pricing: { type: "Free", plans: [] },
-        fullDesc: "Lyria 2 is Google Cloud's latest high-quality audio generation model, capable of creating diverse soundscapes and musical pieces from text prompts. Developed in partnership with Google DeepMind, it supports instrumental music generation, negative prompting, and multiple samples.\n\nPowered by Google Vertex AI (lyria-002).",
-        features: ["Text-to-Music Generation", "Negative Prompting", "Reproducibility (Seed)", "Multiple Samples"],
+        fullDesc: "Lyria 2 is Google Cloud's latest high-quality audio generation model, developed in partnership with Google DeepMind. It is a latent text-to-audio diffusion model capable of creating diverse soundscapes and musical pieces from simple text prompts.\n\nKey Capabilities:\n• Text-to-Music: Generate high-fidelity instrumental music directly from descriptions.\n• Negative Prompting: Fine-tune output by specifying elements to exclude from the audio.\n• Reproducibility: Support for Seed values ensures consistent outputs for identical parameters.\n• Multiple Samples: Generate and compare up to 4 distinct musical snippets in a single request.\n• Studio Quality: Outputs 48kHz WAV audio with professional-grade clarity.\n• SynthID Watermarking: Integrated with digital watermarking for responsible AI tracking.\n\nOptimized for composers, game developers, and content creators. Powered by Vertex AI (lyria-002).",
+        features: ["48kHz Studio Quality", "Negative Prompting", "Seed Reproducibility", "SynthID Watermarking"],
         bgGradient: "bg-gradient-to-br from-indigo-700 via-blue-800 to-slate-900"
     },
     {
@@ -500,11 +500,11 @@ const toolsToSeed = [
         bgGradient: "bg-gradient-to-br from-purple-600 via-magenta-500 to-pink-500"
     },
     {
-        agentName: "Audio Transcriber (Chirp 3)",
+        agentName: "Audio Transcriber",
         slug: "tool-vertex-stt",
         description: "Elite multilingual speech-to-text with advanced Speaker Diarization.",
         category: "Productivity",
-        avatar: "/AGENTS_IMG/AITRANS.png",
+        avatar: "/AGENTS_IMG/audio-transcriber.png",
         status: "Live",
         provider: "google",
         pricingModel: "Free",
@@ -514,7 +514,7 @@ const toolsToSeed = [
         bgGradient: "bg-gradient-to-br from-teal-400 to-emerald-600"
     },
     {
-        agentName: "AI Voice Generator (Neural2)",
+        agentName: "AI Voice Generator",
         slug: "tool-audio-convert",
         description: "Transform written content into natural, studio-quality human speech.",
         category: "Productivity",
@@ -528,7 +528,7 @@ const toolsToSeed = [
         bgGradient: "bg-gradient-to-br from-violet-500 to-purple-600"
     },
     {
-        agentName: "AI Document Converter (Doc AI)",
+        agentName: "AI Document Converter",
         slug: "tool-universal-converter",
         description: "Intelligent bidirectional conversion for PDF, DOCX, XLSX, and Images.",
         category: "Productivity",
@@ -541,7 +541,7 @@ const toolsToSeed = [
         features: ["High-Fidelity Conversion", "Layout Intelligence", "OCR & Data Extraction", "Batch Processing"],
     },
     {
-        agentName: "AI Code Writer (Gemini 1.5 Pro)",
+        agentName: "AI Code Writer",
         slug: "tool-code-writer",
         description: "AI Code Writer is an intelligent development assistant that helps developers generate, debug, and optimize code across multiple programming languages.",
         category: "Developer Tools",
@@ -554,37 +554,123 @@ const toolsToSeed = [
         features: ["Pro-Level Coding", "Smart Debugging", "Architecture Design", "Multi-language Support"],
         bgGradient: "bg-gradient-to-br from-emerald-500 to-green-600"
     },
+    {
+        agentName: "Image Understanding",
+        slug: "tool-image-understanding-claude",
+        description: "Anthropic’s most advanced AI model, designed for complex reasoning, advanced coding, research, and intelligent automation.",
+        category: "Creative",
+        avatar: "/AGENTS_IMG/image-understanding.png",
+        status: "Live",
+        provider: "google",
+        pricingModel: "Free",
+        pricing: { type: "Free", plans: [] },
+        fullDesc: "Claude Opus 4.1 is Anthropic’s most advanced AI model, designed for complex reasoning, advanced coding, research, and intelligent automation. It can analyze large datasets, understand long documents, generate high-quality code, and assist with sophisticated problem-solving across multiple domains.\n\nKey Capabilities:\n• Advanced Reasoning: Solves complex problems, performs deep analysis, and handles multi-step reasoning tasks.\n• Professional Code Generation: Generates, explains, and debugs code across multiple programming languages.\n• Long Document Analysis: Understands and analyzes large documents, reports, research papers, and technical content.\n• AI Agent Support: Ideal for building autonomous AI agents that can plan tasks, make decisions, and perform workflows.\n• Natural Language Understanding: Accurately interprets user instructions and generates detailed, context-aware responses.\n• Research & Knowledge Assistance: Helps with research, summarization, information extraction, and technical explanations.\n• Content Creation: Generates structured content such as articles, reports, documentation, and presentations.\n• Multitask Intelligence: Handles a wide range of tasks including coding, writing, analysis, and problem-solving in a single model.",
+        features: [
+            "Advanced Reasoning",
+            "Professional Code Gen",
+            "Long Document Analysis",
+            "Multitask Intelligence"
+        ],
+        bgGradient: "bg-gradient-to-br from-amber-600 to-orange-800"
+    },
+    {
+        agentName: "AI Pixel Segmentor",
+        slug: "tool-pixel-segmentor-sam",
+        description: "Advanced vision model designed for precise pixel-level image segmentation using natural language prompts or simple clicks.",
+        category: "Vision",
+        avatar: "/AGENTS_IMG/pixel-segmentor.png",
+        status: "Live",
+        provider: "google",
+        pricingModel: "Free",
+        pricing: { type: "Free", plans: [] },
+        fullDesc: "Segment Anything 3 is an advanced vision foundation model designed for precise pixel-level image segmentation. It can detect and isolate objects in images using natural language prompts, bounding boxes, or simple clicks, enabling developers to segment any object or region with high accuracy.\n\nThe model supports open-vocabulary segmentation, meaning it can identify and segment objects even if they were never explicitly trained as predefined categories. This makes it ideal for applications such as computer vision systems, image editing tools, medical imaging, and dataset annotation.\n\nKey Capabilities:\n• Prompt-Based Segmentation: Segment objects using text, bounding boxes, or click points.\n• Pixel-Level Masking: Produces high-quality segmentation masks that outline objects precisely.\n• Open-Vocabulary Detection: Segment any concept described by text, not just predefined classes.\n• Multi-Object Segmentation: Detect and segment multiple objects simultaneously in a single image.\n• Video Object Tracking: Track segmented objects across video frames for dynamic analysis.\n• Zero-Shot Segmentation: Generalizes to new or unseen objects without additional training.\n• Scalable AI Vision: Foundation model designed for large-scale image and video processing pipelines.",
+        features: [
+            "Pixel-Level Masks",
+            "Open-Vocabulary",
+            "Prompted Segments",
+            "Zero-Shot Learning"
+        ],
+        bgGradient: "bg-gradient-to-br from-violet-600 to-indigo-900"
+    },
+    {
+        agentName: "Pathology",
+        slug: "tool-pathology-medgemma",
+        description: "Domain-specialized foundation models optimized for medical imagery, pathology reports, and healthcare data analysis.",
+        category: "Medical",
+        avatar: "/AGENTS_IMG/pathology.png",
+        status: "Live",
+        provider: "google",
+        pricingModel: "Free",
+        pricing: { type: "Free", plans: [] },
+        fullDesc: "MedGemma is a family of domain-specialized foundation models built on the Gemma architecture and optimized for medical and healthcare applications. It is designed to process and reason over clinical, biomedical, and diagnostic data, enabling advanced understanding of medical terminology, clinical narratives, and medical imagery.\n\nThe model integrates large language model capabilities with medical domain training, allowing it to perform complex analysis, contextual interpretation, and structured reasoning within healthcare datasets. MedGemma supports multimodal medical data processing, enabling simultaneous interpretation of textual and visual clinical information such as pathology images and medical documentation.\n\nKey Capabilities:\n• Medical Domain Understanding: Deep comprehension of biomedical terminology and pathology reports.\n• Multimodal Processing: Analyze and correlate medical text and images within a unified framework.\n• Clinical Reasoning: Supports structured reasoning to derive contextual insights from medical data.\n• Biomedical Knowledge: Leverages large-scale clinical data to interpret disease patterns.\n• Advanced NLP: Medical text generation, summarization, and structured information extraction.\n• Enterprise Integration: Scalable deployment on Vertex AI for healthcare data pipelines.",
+        features: [
+            "Clinical Reasoning",
+            "Pathology Image Analysis",
+            "Medical Multimodality",
+            "Secure HIPAA Compliance"
+        ],
+        bgGradient: "bg-gradient-to-br from-teal-600 to-emerald-900"
+    },
+    {
+        agentName: "Derm Foundation",
+        slug: "tool-derm-foundation",
+        description: "Specialized medical foundation model designed for dermatology image analysis and skin disease understanding.",
+        category: "Medical",
+        avatar: "/AGENTS_IMG/derm-foundation.png",
+        status: "Live",
+        provider: "google",
+        pricingModel: "Free",
+        pricing: { type: "Free", plans: [] },
+        fullDesc: "Derm Foundation is a specialized medical foundation model designed for dermatology image analysis and skin disease understanding. The model is trained on large-scale dermatological datasets to learn visual patterns of skin conditions, lesions, and dermatological abnormalities.\n\nKey Capabilities:\n• Dermatology Image Understanding: Ability to interpret dermatological visual features such as skin lesions, pigmentation patterns, textures, and abnormalities.\n• High-Quality Image Embeddings: Generates dense feature embeddings from dermatology images, enabling efficient representation of skin disease characteristics.\n• Skin Disease Pattern Recognition: Learns complex visual patterns associated with various dermatological conditions and skin disorders.\n• Medical Image Feature Extraction: Extracts clinically meaningful visual features from dermatology images that can be used for downstream AI models.\n• Support for Model Training: Embeddings produced by the model can be used to train custom classifiers for dermatology diagnosis and research tasks.\n• Integration with AI Pipelines: Can be integrated into Vertex AI pipelines and medical imaging workflows for scalable dermatology AI development.",
+        features: [
+            "Dermatology Vision",
+            "Image Embeddings",
+            "Pattern Recognition",
+            "Feature Extraction"
+        ],
+        bgGradient: "bg-gradient-to-br from-cyan-600 to-teal-900"
+    },
+    {
+        agentName: "Radiology",
+        slug: "tool-cxr-foundation",
+        description: "Specialized medical imaging foundation model developed for radiology applications, particularly chest X-ray analysis.",
+        category: "Radiology",
+        avatar: "/AGENTS_IMG/cxr-foundation.png",
+        status: "Live",
+        provider: "google",
+        pricingModel: "Free",
+        pricing: { type: "Free", plans: [] },
+        fullDesc: "CXR Foundation is a specialized medical imaging foundation model developed for radiology applications, particularly chest X-ray analysis. The model is trained on large-scale radiology datasets containing chest radiographs, enabling it to learn complex visual representations of anatomical structures and radiological abnormalities.\n\nKey Capabilities:\n• Radiology Image Understanding: Ability to interpret visual structures present in chest X-ray images, including lungs, heart, bones, and surrounding thoracic anatomy.\n• High-Quality Medical Image Embeddings: Generates dense feature embeddings that represent radiological patterns and abnormalities present in X-ray images.\n• Disease Pattern Recognition: Learns visual indicators associated with radiological conditions and thoracic abnormalities through large-scale training data.\n• Medical Feature Extraction: Extracts clinically meaningful imaging features that can be used for diagnostic modeling and radiology research.\n• Support for Downstream Model Training: Embeddings produced by the model can be used to train custom classifiers and detection models for radiology tasks.\n• Scalable Radiology AI Integration: Designed to integrate into Vertex AI medical imaging pipelines, enabling scalable development of radiology analytics systems.",
+        features: [
+            "Chest X-Ray Analysis",
+            "Thoracic Anatomy Vision",
+            "Disease Pattern Recognition",
+            "Radiology AI Embeddings"
+        ],
+        bgGradient: "bg-gradient-to-br from-blue-700 to-slate-900"
+    },
+    {
+        agentName: "Geospatial",
+        slug: "tool-geospatial-sensing",
+        description: "Vision-language foundation model designed for geospatial analysis of aerial and satellite imagery.",
+        category: "Geospatial",
+        avatar: "/AGENTS_IMG/geospatial-sensing.png",
+        status: "Live",
+        provider: "google",
+        pricingModel: "Free",
+        pricing: { type: "Free", plans: [] },
+        fullDesc: "Imagery – Classification and Retrieval for Remote Sensing is a vision-language foundation model designed for geospatial analysis of aerial and satellite imagery. The model is trained on large-scale remote sensing datasets to learn the relationship between visual geospatial patterns and semantic descriptions.\n\nKey Capabilities:\n• Satellite and Aerial Image Understanding: Ability to interpret complex visual structures present in remote sensing imagery, including landforms, infrastructure, vegetation patterns, and environmental features.\n• Zero-Shot Image Classification: Supports classification of geospatial imagery into semantic categories without requiring additional model training.\n• Geospatial Image Retrieval: Enables efficient search and retrieval of satellite images based on visual similarity or semantic queries.\n• Vision–Language Alignment: Maps geospatial imagery and textual descriptions into a shared embedding space, enabling cross-modal understanding of geographic data.\n• High-Dimensional Image Embeddings: Generates dense feature representations of satellite imagery that capture spatial patterns and environmental structures.\n• Scalable Remote Sensing Analysis: Designed to integrate with large-scale geospatial AI pipelines, supporting high-volume satellite data processing and geographic intelligence systems.",
+        features: [
+            "Satellite Vision",
+            "Zero-Shot Classify",
+            "Image Retrieval",
+            "Geospatial Analytics"
+        ],
+        bgGradient: "bg-gradient-to-br from-indigo-800 to-blue-900"
+    },
 
     // Utilities / Others
     // --- WORKSPACE AGENTS ---
-    {
-        agentName: "AIBIZ",
-        slug: "tool-aibiz",
-        description: "Advanced Business Intelligence and CRM Workspace. Track analytics, manage leads, and segment customers seamlessly.",
-        category: "Business OS",
-        avatar: "", // Will fallback to Lucide Icon
-        status: "Live",
-        provider: "google",
-        pricingModel: "Free",
-        pricing: { type: "Free", plans: [] },
-        fullDesc: "Complete Business Intelligence and CRM management suite powered by advanced AI and data analytics. Segment your customers and track interaction histories to score leads effectively.",
-        features: ["CRM Analytics", "Lead Scoring", "Customer Segmentation", "Campaign Generation"],
-        bgGradient: "bg-gradient-to-br from-red-500 to-rose-600"
-    },
-    {
-        agentName: "AIHIRE",
-        slug: "tool-aihire",
-        description: "Intelligent Recruitment Engine. Evaluate candidates, parse resumes, and generate comprehensive hiring strategies.",
-        category: "HR & Finance",
-        avatar: "",
-        status: "Live",
-        provider: "google",
-        pricingModel: "Free",
-        pricing: { type: "Free", plans: [] },
-        fullDesc: "Simplify the hiring process. Use AI to automatically score resumes, prevent bias, extract professional skills, and prepare interview questions tailored to specific roles.",
-        features: ["Resume Parsing", "Candidate Scoring", "Bias Prevention", "Interview Prep"],
-        bgGradient: "bg-gradient-to-br from-emerald-500 to-teal-600"
-    },
     {
         agentName: "AIHEALTH",
         slug: "tool-aihealth",
@@ -613,46 +699,14 @@ const toolsToSeed = [
         features: ["Copywriting", "SEO Optimization", "Content Refining", "Manuscript Editing"],
         bgGradient: "bg-gradient-to-br from-fuchsia-500 to-pink-600"
     },
-    {
-        agentName: "AISALES",
-        slug: "tool-aisales",
-        description: "AI Sales Command Center. Analyze sales cycles and structure growth operations.",
-        category: "Sales & Marketing",
-        avatar: "",
-        status: "Live",
-        provider: "google",
-        pricingModel: "Free",
-        pricing: { type: "Free", plans: [] },
-        fullDesc: "Command center for your sales ops. Build personalized cold outreach strategies, follow-up timelines, and sales funnels powered by intelligent LLMs.",
-        features: ["Outreach Strategy", "Sales Funnels", "Pricing Analysis", "Competitor Research"],
-        bgGradient: "bg-gradient-to-br from-blue-500 to-indigo-600"
-    },
-    {
-        agentName: "AIDESK",
-        slug: "tool-aidesk",
-        description: "Support Desk & Ticket Resolution AI. Resolve customer queries efficiently.",
-        category: "Business OS",
-        avatar: "",
-        status: "Live",
-        provider: "google",
-        pricingModel: "Free",
-        pricing: { type: "Free", plans: [] },
-        fullDesc: "A complete AI Service Desk context. Solve user tickets efficiently, retrieve product knowledge instantly, and maintain quality customer service standards.",
-        features: ["Ticket Resolution", "Customer Support", "Knowledge Retrieval", "Automated QA"],
-        bgGradient: "bg-gradient-to-br from-amber-500 to-orange-500"
-    }
 ];
 
 export const seedTools = async () => {
     try {
         const forcedOrderSlugs = [
             // Workspace Agents First
-            'tool-aibiz',
-            'tool-aihire',
             'tool-aihealth',
             'tool-aiwrite',
-            'tool-aisales',
-            'tool-aidesk',
             // OpenAI First
             'tool-openai-search-preview',
             'tool-openai-search-pro',
@@ -688,6 +742,12 @@ export const seedTools = async () => {
             'tool-universal-converter',
             'tool-code-writer',
             'tool-image-edit',
+            'tool-image-understanding-claude',
+            'tool-pixel-segmentor-sam',
+            'tool-pathology-medgemma',
+            'tool-derm-foundation',
+            'tool-cxr-foundation',
+            'tool-geospatial-sensing',
             // Others
             // Deleted Tools (Keep in deletion list)
             'tool-marketing-agency',
@@ -695,7 +755,6 @@ export const seedTools = async () => {
             'tool-academic-research',
             'tool-bug-assistant',
             'tool-travel-concierge',
-            'tool-derm-foundation',
             'tool-brand-search-optimization',
             'tool-fomc-research',
             'tool-image-scoring',
@@ -713,6 +772,7 @@ export const seedTools = async () => {
 
         // Ensure old/redundant tools are removed
         await agentModel.deleteOne({ slug: 'tool-music-gen' });
+        await agentModel.deleteMany({ slug: { $in: ['tool-aibiz', 'tool-aihire', 'tool-aisales', 'tool-aidesk'] } });
         await agentModel.deleteMany({ slug: { $in: forcedOrderSlugs } });
         console.log("[SEED] Reset marketplace sequence: OpenAI First, Vertex AI Second.");
 

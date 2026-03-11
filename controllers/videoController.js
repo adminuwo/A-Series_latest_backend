@@ -56,23 +56,28 @@ export const generateVideo = async (req, res) => {
 import vertexService from '../services/vertex.service.js';
 
 // Function to generate video using Replicate or Fallback
-// Function to generate video using Vertex AI (Veo Model) or Fallback
+// Function to generate video using Vertex AI (Veo 3) or Fallback
 export const generateVideoFromPrompt = async (prompt, duration, quality) => {
   try {
-    logger.info('[VIDEO] Attempting generation via Vertex AI Veo (veo-001-preview)...');
+    const modelId = 'veo-3.0-generate-preview';
+    const location = 'us-central1';
+    const projectId = process.env.GCP_PROJECT_ID || 'ai-mall-484810';
+
+    // We attempt to use the project-id as bucket name, or a subfolder if provided
+    const storageUri = `gs://${projectId}-vids`; // Typical naming or user-provided
+
+    logger.info(`[VIDEO] Starting Veo 3 Long-Running Operation: ${modelId}`);
+    logger.info(`[VIDEO] Target Storage: ${storageUri}`);
 
     const auth = new GoogleAuth({
       scopes: 'https://www.googleapis.com/auth/cloud-platform',
-      projectId: process.env.GCP_PROJECT_ID || process.env.PROJECT_ID
+      projectId: projectId
     });
     const client = await auth.getClient();
-    const projectId = await auth.getProjectId();
     const accessTokenResponse = await client.getAccessToken();
     const token = accessTokenResponse.token || accessTokenResponse;
 
-    // Use Veo model
-    const modelId = 'veo-001-preview';
-    const location = 'us-central1'; // Veo is available in us-central1
+    // 1. Initial POST to :predict to start the LRO
     const endpoint = `https://${location}-aiplatform.googleapis.com/v1/projects/${projectId}/locations/${location}/publishers/google/models/${modelId}:predict`;
 
     const response = await axios.post(
@@ -80,57 +85,90 @@ export const generateVideoFromPrompt = async (prompt, duration, quality) => {
       {
         instances: [{ prompt: prompt }],
         parameters: {
-          video_length_seconds: duration || 5,
-          sample_count: 1,
-          aspect_ratio: "16:9"
+          sampleCount: 1,
+          storageUri: storageUri,
+          // Optional: resolution: "1280x720"
         }
       },
       {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
-        },
-        timeout: 180000 // 3 minutes timeout
+        }
       }
     );
 
-    if (response.data && response.data.predictions && response.data.predictions[0]) {
-      const prediction = response.data.predictions[0];
-      let base64Data = prediction.bytesBase64Encoded || prediction.video?.bytesBase64Encoded;
+    const operation = response.data;
+    if (!operation || !operation.name) {
+      throw new Error(`Failed to start video generation: ${JSON.stringify(operation)}`);
+    }
 
-      if (!base64Data && typeof prediction === 'string') {
-        base64Data = prediction;
-      }
+    // operation.name looks like: projects/PROJECT_ID/locations/LOCATION/publishers/google/models/veo-3.0-generate-preview/operations/OPERATION_ID
+    const operationName = operation.name;
+    logger.info(`[VIDEO LRO] Operation started: ${operationName}`);
 
-      if (base64Data) {
-        const buffer = Buffer.from(base64Data, 'base64');
-        const uploadResult = await uploadToCloudinary(buffer, {
-          resource_type: 'video',
-          folder: 'aisa_generated_videos'
-        });
-        logger.info(`[VERTEX VEO] Uploaded to Cloudinary: ${uploadResult.secure_url}`);
-        return uploadResult.secure_url;
+    // 2. Poll for Completion (Note: Documentation shows POST for status in preview)
+    let isDone = false;
+    let attempts = 0;
+    const maxAttempts = 36; // 6 minutes (10s per poll)
+    let finalVideoUrl = null;
+
+    while (!isDone && attempts < maxAttempts) {
+      attempts++;
+      logger.info(`[VIDEO LRO] Polling... (Attempt ${attempts}/${maxAttempts})`);
+
+      await new Promise(resolve => setTimeout(resolve, 10000)); // Wait 10s
+
+      try {
+        // We use GET for standard LRO behavior, but fallback to POST if needed as per specific preview docs
+        const pollResponse = await axios.get(
+          `https://${location}-aiplatform.googleapis.com/v1/${operationName}`,
+          { headers: { 'Authorization': `Bearer ${token}` } }
+        );
+
+        const pollData = pollResponse.data;
+        if (pollData.done) {
+          isDone = true;
+          if (pollData.error) {
+            throw new Error(`Veo 3 Operation Error: ${pollData.error.message}`);
+          }
+
+          const result = pollData.response;
+          if (result && result.videos && result.videos[0]) {
+            const video = result.videos[0];
+            if (video.bytesBase64Encoded) {
+              const buffer = Buffer.from(video.bytesBase64Encoded, 'base64');
+              const uploadResult = await uploadToCloudinary(buffer, { resource_type: 'video', folder: 'aisa_generated_videos' });
+              finalVideoUrl = uploadResult.secure_url;
+            } else if (video.gcsUri) {
+              logger.info(`[VIDEO LRO] Video generated at: ${video.gcsUri}`);
+              // Since we don't have GCS SDK, we'll try to guess the public URL or notify the user
+              // For a production app, you'd use @google-cloud/storage to download here.
+              // We'll return the GCS link for now or attempt a public redirect if applicable
+              finalVideoUrl = video.gcsUri;
+            }
+          }
+        }
+      } catch (pollErr) {
+        logger.error(`[VIDEO POLL ERROR] ${pollErr.message}`);
       }
     }
 
-    throw new Error('Vertex AI Veo did not return a valid video payload.');
+    if (finalVideoUrl) return finalVideoUrl;
+    throw new Error('Video generation timed out or returned no data.');
 
   } catch (error) {
-    logger.error(`[VERTEX VIDEO ERROR] ${error.message}. Attempting Pollinations fallback...`);
+    const errorMsg = error.response?.data?.error?.message || error.message;
+    logger.error(`[VERTEX VEO 3 ERROR] ${errorMsg}`);
 
-    // Fallback to Pollinations so the user at least gets something
+    // Robust Fallback to Pollinations
     try {
-      const fallbackResult = await generateVideoWithPollinations(prompt, duration, quality);
-      if (fallbackResult) {
-        const fallbackUrl = typeof fallbackResult === 'object' ? fallbackResult.url : fallbackResult;
-        logger.info(`[VIDEO FALLBACK] Success with Pollinations: ${fallbackUrl}`);
-        return fallbackUrl;
-      }
-    } catch (fallbackError) {
-      logger.error(`[VIDEO FALLBACK ERROR] ${fallbackError.message}`);
+      logger.info('[VIDEO] Falling back to Pollinations...');
+      const fallbackResult = await generateVideoWithPollinations(prompt);
+      return typeof fallbackResult === 'object' ? fallbackResult.url : fallbackResult;
+    } catch (e) {
+      throw new Error(`Cloud Gen Failed: ${errorMsg}`);
     }
-
-    throw error;
   }
 };
 
