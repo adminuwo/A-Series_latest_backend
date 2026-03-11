@@ -124,29 +124,31 @@ router.post("/", optionalVerifyToken, identifyGuest, async (req, res) => {
         }
 
         // 4. AUDIO TRANSCRIBER (STT)
-        else if (targetAgent.slug === 'tool-openai-stt' && allAttachments.length > 0) {
-          const audioFile = allAttachments.find(a => a.mimeType?.startsWith('audio/') || a.name?.endsWith('.mp3') || a.name?.endsWith('.wav'));
+        else if (targetAgent.slug === 'tool-openai-stt' && (allAttachments.length > 0 || content)) {
+          const audioFile = allAttachments.find(a => a.mimeType?.startsWith('audio/') || a.type === 'audio' || a.name?.endsWith('.mp3') || a.name?.endsWith('.wav'));
           if (audioFile) {
             const buffer = Buffer.from(audioFile.base64Data, 'base64');
             const text = await openaiService.speechToText(buffer, modelMapping);
-            await logUsage(req.user?.id || 'guest', targetAgent._id, 0, 'Speech-to-Text'); // STT usage is not token-based
+            await logUsage(req.user?.id || 'guest', targetAgent._id, 0, 'Speech-to-Text');
             return res.status(200).json({ reply: `### Transcription:\n\n${text}` });
+          } else {
+            // If no audio file, treat as standard chat but with specialized persona
+            const result = await openaiService.generateContent(content, modelMapping, history, { system: systemInstruction });
+            await logUsage(req.user?.id || 'guest', targetAgent._id, result.usage?.total_tokens, 'Standard Chat');
+            return res.status(200).json({ reply: result.content });
           }
         }
 
         // 5. DOCUMENT INTELLIGENCE
         else if (targetAgent.slug === 'tool-openai-document' && document) {
-          // For now, we use the pre-extracted text logic if available in parts, 
-          // or we can pass a summary prompt. OpenAI doesn't natively "read" PDFs like Gemini yet in the chat completions API 
-          // without assistants API, so we rely on the text extracted by mammoth/PDF parsers in chatRoutes.
-          const result = await openaiService.generateContent(content, modelMapping);
+          const result = await openaiService.generateContent(content, modelMapping, history, { system: systemInstruction });
           await logUsage(req.user?.id || 'guest', targetAgent._id, result.usage?.total_tokens, 'Document Intelligence');
           return res.status(200).json({ reply: result.content });
         }
 
         // 6. STANDARD CHAT / CONTENT WRITER / CODE ASSISTANT
         else {
-          const result = await openaiService.generateContent(content, modelMapping);
+          const result = await openaiService.generateContent(content, modelMapping, history, { system: systemInstruction });
           openaiReply = result.content;
 
           // Log Usage
@@ -293,8 +295,9 @@ CRITICAL RULE: NEVER output raw JSON text or markdown code blocks containing "ac
     if (detectedMode === 'FILE_CONVERSION' || detectedMode === 'FILE_ANALYSIS') {
       finalSystemInstruction = modeSystemInstruction;
     } else if (agentType && agentType !== 'AISA') {
-      // For specialized agents, append the mode instruction and tool rules to the base identity
-      finalSystemInstruction = `${modeSystemInstruction}\n\n${TOOL_USAGE_RULES}\n\nRemember, your specific persona is ${agentName} from the ${agentCategory} category.`;
+      // For specialized agents, ENRICH the provided systemInstruction instead of replacing it
+      // This ensures the agent knows its identity (from systemInstruction) AND its mode/tools (from modeSystemInstruction)
+      finalSystemInstruction = `${systemInstruction || ''}\n\n${modeSystemInstruction || ''}\n\n${TOOL_USAGE_RULES}\n\nRemember, your specific persona is ${agentName} from the ${agentCategory} category.`.trim();
     } else {
       finalSystemInstruction = `${finalSystemInstruction}\n\n${TOOL_USAGE_RULES}`;
     }
@@ -1255,15 +1258,27 @@ router.get('/', optionalVerifyToken, identifyGuest, async (req, res) => {
     }
 
     if (userId) {
-      query.userId = userId;
-      sessions = await Conversation.find(query)
-        .select('sessionId title lastModified userId agentType')
+      // Find sessions owned by the user OR anonymous sessions linked to this guestId
+      const orQuery = [{ userId: userId }];
+      if (guestId) {
+        orQuery.push({ guestId: guestId, userId: { $exists: false } });
+        orQuery.push({ guestId: guestId, userId: null });
+      }
+
+      sessions = await Conversation.find({
+        ...query,
+        $or: orQuery
+      })
+        .select('sessionId title lastModified userId guestId agentType')
         .sort({ lastModified: -1 });
+
+      console.log(`[CHAT] Fetched ${sessions.length} sessions for user ${userId} (guestId: ${guestId})`);
     } else if (guestId) {
       query.guestId = guestId;
       sessions = await Conversation.find(query)
         .select('sessionId title lastModified guestId agentType')
         .sort({ lastModified: -1 });
+      console.log(`[CHAT] Fetched ${sessions.length} sessions for guest ${guestId}`);
     }
 
     res.json(sessions);
@@ -1318,7 +1333,7 @@ router.get('/:sessionId', optionalVerifyToken, identifyGuest, async (req, res) =
         if (canLink || !session.guestId) { // !session.guestId handles legacy/edge cases
           session.userId = userId;
           await session.save();
-          await userModel.findByIdAndUpdate(userId, { $addToSet: { Conversations: session._id } });
+          await userModel.findByIdAndUpdate(userId, { $addToSet: { chatSessions: session._id } });
           console.log(`[CHAT] Linked guest session ${sessionId} to user ${userId}`);
         }
       }
@@ -1455,7 +1470,7 @@ router.post('/:sessionId/message', optionalVerifyToken, identifyGuest, async (re
     if (userId && mongoose.Types.ObjectId.isValid(userId)) {
       await userModel.findByIdAndUpdate(
         userId,
-        { $addToSet: { Conversations: session._id } },
+        { $addToSet: { chatSessions: session._id } },
         { new: true }
       );
       console.log(`[CHAT] Associated session ${session._id} with user ${userId}.`);
@@ -1651,7 +1666,7 @@ router.delete('/:sessionId', verifyToken, async (req, res) => {
       $or: [{ userId: userId }, { userId: { $exists: false } }, { userId: null }]
     });
     if (session) {
-      await userModel.findByIdAndUpdate(userId, { $pull: { Conversations: session._id } });
+      await userModel.findByIdAndUpdate(userId, { $pull: { chatSessions: session._id } });
     }
     res.json({ message: 'History cleared' });
   } catch (err) {

@@ -47,7 +47,8 @@ const conversationSchema = new mongoose.Schema({
     lastMessageAt: { type: Date, default: Date.now },
     lastModified: { type: Date, default: Date.now },
     detectedMode: { type: String, default: 'NORMAL_CHAT' },
-    agentType: { type: String, default: 'AISA' } // Default agent for this session
+    agentType: { type: String, default: 'AISA' }, // Default agent for this session
+    guestId: { type: String, index: true } // Support for guest chat history
 }, { timestamps: true });
 
 export default mongoose.model('Conversation', conversationSchema, 'conversations');
